@@ -1,0 +1,25 @@
+{
+  "rules": {
+    "chat": {
+      "messages": {
+        ".read": true,
+        ".indexOn": ["timestamp"],
+        "$messageId": {
+          ".write": "!data.exists()",
+          ".validate": "newData.hasChildren(['address', 'text', 'timestamp', 'displayName', 'color']) && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 200 && newData.child('address').isString() && newData.child('address').val().length >= 32 && newData.child('address').val().length <= 44 && newData.child('displayName').isString() && newData.child('displayName').val().length <= 50 && newData.child('color').isString() && newData.child('timestamp').isNumber() && newData.child('timestamp').val() <= now + 60000"
+        }
+      }
+    },
+    "rounds": {
+      ".read": true,
+      "$roundId": {
+        ".write": true,
+        ".validate": "newData.hasChildren(['roundId', 'status', 'totalUsdc', 'participantsCount', 'winner', 'startTs', 'endTs'])"
+      }
+    },
+    "$other": {
+      ".read": false,
+      ".write": false
+    }
+  }
+}

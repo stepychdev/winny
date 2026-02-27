@@ -1,0 +1,222 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Main metallic gradient -->
+    <linearGradient id="metalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e0d0f0"/>
+      <stop offset="18%" stop-color="#c4b0e0"/>
+      <stop offset="35%" stop-color="#a88dc8"/>
+      <stop offset="50%" stop-color="#d6c8e8"/>
+      <stop offset="65%" stop-color="#8a6aac"/>
+      <stop offset="80%" stop-color="#b8a0d4"/>
+      <stop offset="100%" stop-color="#9078b8"/>
+    </linearGradient>
+
+    <!-- Highlight shimmer gradient -->
+    <linearGradient id="shimmer" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.7"/>
+      <stop offset="30%" stop-color="#e8daf5" stop-opacity="0.5"/>
+      <stop offset="60%" stop-color="#c0a8d8" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#8866aa" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Secondary gradient for depth -->
+    <radialGradient id="depthGrad" cx="40%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#f0e8ff" stop-opacity="0.9"/>
+      <stop offset="40%" stop-color="#c8b0e0" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#7a5a9e" stop-opacity="0.3"/>
+    </radialGradient>
+
+    <!-- Small blob gradient -->
+    <radialGradient id="smallBlobGrad" cx="45%" cy="30%" r="55%">
+      <stop offset="0%" stop-color="#ece0f8"/>
+      <stop offset="35%" stop-color="#c8b4de"/>
+      <stop offset="70%" stop-color="#a088c0"/>
+      <stop offset="100%" stop-color="#8870a8"/>
+    </radialGradient>
+
+    <!-- Specular highlight -->
+    <radialGradient id="specular1" cx="35%" cy="25%" r="30%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.85"/>
+      <stop offset="50%" stop-color="#f0e4ff" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#d0c0e0" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="specular2" cx="60%" cy="55%" r="25%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#b898d0" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Shadow gradient -->
+    <radialGradient id="shadowGrad" cx="50%" cy="70%" r="40%">
+      <stop offset="0%" stop-color="#6a4a8e" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#6a4a8e" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Edge reflection -->
+    <linearGradient id="edgeReflect" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#9880b8"/>
+      <stop offset="25%" stop-color="#d4c4e8"/>
+      <stop offset="50%" stop-color="#b098cc"/>
+      <stop offset="75%" stop-color="#e8dcf4"/>
+      <stop offset="100%" stop-color="#a488c0"/>
+    </linearGradient>
+
+    <!-- Filter for soft glow -->
+    <filter id="softGlow" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+
+    <!-- Filter for subtle inner shadow -->
+    <filter id="innerShadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4" result="blur"/>
+      <feOffset dx="2" dy="3" result="offsetBlur"/>
+      <feFlood flood-color="#5a3a80" flood-opacity="0.3"/>
+      <feComposite in2="offsetBlur" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- ========== MAIN LARGE BLOB ========== -->
+  <!-- Base shape with metallic gradient -->
+  <path d="M148 340 
+    C120 310, 105 275, 108 240 
+    C110 210, 125 185, 148 168 
+    C165 155, 185 148, 205 142 
+    C225 136, 248 128, 268 118 
+    C288 108, 308 95, 328 90 
+    C348 85, 370 88, 388 98 
+    C406 108, 418 125, 428 145 
+    C438 165, 442 188, 440 212 
+    C438 236, 430 258, 420 278 
+    C410 298, 395 315, 378 330 
+    C360 345, 338 358, 315 368 
+    C292 378, 268 385, 242 388 
+    C216 391, 190 385, 170 372 
+    C155 362, 148 355, 148 340 Z"
+    fill="url(#metalGrad)" filter="url(#innerShadow)"/>
+
+  <!-- Depth layer -->
+  <path d="M148 340 
+    C120 310, 105 275, 108 240 
+    C110 210, 125 185, 148 168 
+    C165 155, 185 148, 205 142 
+    C225 136, 248 128, 268 118 
+    C288 108, 308 95, 328 90 
+    C348 85, 370 88, 388 98 
+    C406 108, 418 125, 428 145 
+    C438 165, 442 188, 440 212 
+    C438 236, 430 258, 420 278 
+    C410 298, 395 315, 378 330 
+    C360 345, 338 358, 315 368 
+    C292 378, 268 385, 242 388 
+    C216 391, 190 385, 170 372 
+    C155 362, 148 355, 148 340 Z"
+    fill="url(#depthGrad)" opacity="0.6"/>
+
+  <!-- Edge reflection overlay -->
+  <path d="M148 340 
+    C120 310, 105 275, 108 240 
+    C110 210, 125 185, 148 168 
+    C165 155, 185 148, 205 142 
+    C225 136, 248 128, 268 118 
+    C288 108, 308 95, 328 90 
+    C348 85, 370 88, 388 98 
+    C406 108, 418 125, 428 145 
+    C438 165, 442 188, 440 212 
+    C438 236, 430 258, 420 278 
+    C410 298, 395 315, 378 330 
+    C360 345, 338 358, 315 368 
+    C292 378, 268 385, 242 388 
+    C216 391, 190 385, 170 372 
+    C155 362, 148 355, 148 340 Z"
+    fill="url(#edgeReflect)" opacity="0.25"/>
+
+  <!-- Main specular highlight -->
+  <path d="M175 260 
+    C170 235, 180 210, 200 195 
+    C220 180, 245 175, 268 178 
+    C290 180, 310 190, 320 205 
+    C330 220, 328 240, 315 255 
+    C302 270, 280 275, 258 272 
+    C235 269, 210 265, 195 268 
+    C180 270, 175 268, 175 260 Z"
+    fill="url(#specular1)" opacity="0.7"/>
+
+  <!-- Secondary highlight on right side -->
+  <ellipse cx="390" cy="180" rx="35" ry="50"
+    fill="url(#specular2)" opacity="0.5" transform="rotate(-25 390 180)"/>
+
+  <!-- Bottom shadow depth -->
+  <ellipse cx="280" cy="370" rx="90" ry="25"
+    fill="url(#shadowGrad)" opacity="0.4"/>
+
+  <!-- Chrome reflection stripe -->
+  <path d="M160 295 
+    C180 280, 220 270, 260 268 
+    C300 266, 340 272, 370 285 
+    C350 278, 310 274, 270 275 
+    C230 276, 190 282, 165 292 Z"
+    fill="#ffffff" opacity="0.2"/>
+
+  <!-- Shimmer overlay -->
+  <path d="M200 200 
+    C220 185, 260 175, 290 180 
+    C320 185, 340 200, 330 215 
+    C320 228, 290 230, 260 225 
+    C230 220, 210 212, 200 200 Z"
+    fill="url(#shimmer)" opacity="0.5"/>
+
+  <!-- ========== SMALL DETACHED BLOB ========== -->
+  <!-- Small blob base -->
+  <path d="M190 148 
+    C178 138, 172 122, 176 108 
+    C180 94, 192 84, 206 82 
+    C220 80, 234 86, 242 98 
+    C250 110, 250 126, 242 138 
+    C234 150, 220 156, 206 154 
+    C198 152, 192 152, 190 148 Z"
+    fill="url(#smallBlobGrad)" filter="url(#softGlow)"/>
+
+  <!-- Small blob highlight -->
+  <ellipse cx="205" cy="105" rx="16" ry="12"
+    fill="#ffffff" opacity="0.55" transform="rotate(-15 205 105)"/>
+
+  <!-- Small blob depth -->
+  <ellipse cx="215" cy="130" rx="14" ry="10"
+    fill="#7a5a9e" opacity="0.2" transform="rotate(10 215 130)"/>
+
+  <!-- ========== ADDITIONAL SURFACE DETAILS ========== -->
+  <!-- Curved reflection on main blob left side -->
+  <path d="M130 280 
+    C135 260, 145 245, 160 235 
+    C155 250, 140 265, 135 285 Z"
+    fill="#e0d4f0" opacity="0.45"/>
+
+  <!-- Top rim light -->
+  <path d="M270 96 
+    C290 90, 315 88, 335 92 
+    C320 90, 295 92, 275 98 Z"
+    fill="#ffffff" opacity="0.6"/>
+
+  <!-- Right side rim light -->
+  <path d="M435 195 
+    C438 215, 436 238, 428 258 
+    C434 238, 436 215, 433 198 Z"
+    fill="#e8dcf4" opacity="0.5"/>
+
+  <!-- Subtle surface undulation -->
+  <path d="M250 320 
+    C280 315, 320 318, 350 328 
+    C325 322, 285 320, 255 324 Z"
+    fill="#ffffff" opacity="0.15"/>
+
+  <!-- Deep shadow crease -->
+  <path d="M180 350 
+    C200 360, 230 368, 260 372 
+    C235 370, 205 364, 185 355 Z"
+    fill="#6a4a8e" opacity="0.25"/>
+</svg>

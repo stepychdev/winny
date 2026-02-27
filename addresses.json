@@ -1,0 +1,45 @@
+{
+  "devnet": {
+    "created_at_utc": "2026-02-24T08:22:53.756Z",
+    "program": {
+      "jackpot_program_id": "4PhNzNQ7XZAPrFmwcBFMe2ZY8ZaQWos8nJjcsjv1CHyh",
+      "program_data": "6jRvTAYrC1yHgPo249jcLdnZoRT5Hz7C199J8N7jQR5i",
+      "upgrade_authority_vault": "ApCkCEvWh9M87ec9S3CE22J3nWWXpqvM5CMfLKSGfSkg"
+    },
+    "protocol_config": {
+      "config_pda": "3XhTHn7U1NWeARAdSosLqTF6dsmZbrdBYHMM835ADYX8",
+      "admin_vault": "12DcA156ScxVWDjbCajADpYidZor34f2mFweNMsmjh2N",
+      "treasury_usdc_token_account": "HukbjaCBAJz5VmzkiDcpNjF2BUsxo8z9WwgSzHgGACMd",
+      "usdc_mint": "GXJV8YiRpXpbUHdf3q6n4hEKNeBPXK9Kn9uGjm6gZksq"
+    },
+    "squads": {
+      "program_config_pda": "BSTq9w3kZwNwpBXJEvTZz2G9ZTNyKBvoSeXMvwb4cNZr",
+      "protocol_treasury": "HM5y4mz3Bt9JY9mr1hkyhnvqxSH4H2u2451j7Hc2dtvK",
+      "members_2_of_3": [
+        "5mjKaFPXX6J4vmcyS1W7u8ostx5Rt1A9knigbpjnQof5",
+        "B4RSFCHfHGspoXRu4FnfYXM6s7GEYkQfsJeDm9ABMzjJ",
+        "5LfW3pcGZFfWkfiaZNKmbw4tZT7K1YnKXFgUBwE3yq7c"
+      ],
+      "ops": {
+        "multisig_pda": "H1AZeYQdHzuGD5h7tWhB4EUm81st7UJRmgFxSpXKFB9L",
+        "vault_pda_index_0": "12DcA156ScxVWDjbCajADpYidZor34f2mFweNMsmjh2N",
+        "timelock_sec": 0,
+        "create_signature": "5auQwsMDNvkALa1jrcTfb3CyxpUS3BqHJRkWNgNUQ91LCWAhBjgHpzoqazxWXqkkB52SRJypYSEongg1S4Md5eUK"
+      },
+      "upgrade": {
+        "multisig_pda": "FcqqTUFso8TM1yoiTqx3JF1KSFcWirp42bCucUWeHbZf",
+        "vault_pda_index_0": "ApCkCEvWh9M87ec9S3CE22J3nWWXpqvM5CMfLKSGfSkg",
+        "timelock_sec": 600,
+        "create_signature": "2mAaLwdfTHExb9LkqcxG9BrxTruFDaurHxz1tH47U1BTaEziaGPPYUMMVePaZuVHxTG5DTDZnkSDRBUyrCf6Gra2"
+      }
+    },
+    "migration_signatures": {
+      "program_upgrade_deploy": "aT2GHnZq9CBLoW74TNwGkcZEw7Wm6u7BS1rEMifNyibuQCNsQQaqDowQGkrNJ93tTFCUdmxjpanvgqhVNQ79U5M",
+      "create_ops_treasury_token_account": "4jRF61bYJnbYSvws6bz3nUc1mZx9yfZP5pzrPkgVU93tvmxJGNKFwbutxJpJdKAU8JydMUfCGYeGGhaYY4u3aWbz",
+      "set_treasury_usdc_ata": "31AqcZKbrZzmVbs7KXjLDwaUkUwmKt8zz5X6Km2uzvYihbZmoiCc38AsN9r2xcdSdGB2Q9QQqchhAX8zDzVLfJSM",
+      "transfer_admin": "2oV4LiZS56sKsWPLGaWucihbTSEt6HZMA4Q4KVtPneYzxME2bj64dSJr324C8bXFreXACPUe68SHYNatVemGQstp",
+      "smoke_pause_true_execute": "5ywU84nc81umXnCbihUF9T7o6HzMXy1SoTk5cHLN3KNPK4jDgb57WNf6WT2VNBGU1npJrRj7vS8m8ycaLPyVnsAo",
+      "smoke_pause_false_execute": "6q87rP7jorU1NpTbBKzSE3GTV27B51UdFSEASBddrC614vVJd7XpQrFAPaaZj3VRv6TCVFfewYGRqdbRnuGGHfg"
+    }
+  }
+}

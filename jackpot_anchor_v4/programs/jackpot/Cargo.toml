@@ -1,0 +1,25 @@
+[package]
+name = "jackpot"
+version = "0.1.0"
+description = "Any-token on-chain jackpot MVP"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "jackpot"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+devnet = []            # include mock_settle instruction (testing only; enable explicitly)
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }
+anchor-spl = "0.31.1"
+ephemeral-vrf-sdk = "0.2.3"
+blake3 = "=1.6.1"
+bytemuck = { version = "1.14", features = ["derive"] }

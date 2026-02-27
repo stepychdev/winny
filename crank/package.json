@@ -1,0 +1,30 @@
+{
+  "name": "jackpot-crank",
+  "version": "1.0.0",
+  "description": "Autonomous crank service for Jackpot rounds (start, lock, VRF, close, auto-claim)",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "tsx --test tests/**/*.test.ts",
+    "start": "npm run start:devnet",
+    "start:devnet": "NODE_OPTIONS='--dns-result-order=ipv4first' tsx --env-file=.env src/index.ts",
+    "start:mainnet": "NODE_OPTIONS='--dns-result-order=ipv4first' tsx --env-file=.env.mainnet src/index.ts",
+    "dev": "NODE_OPTIONS='--dns-result-order=ipv4first' tsx watch --env-file=.env src/index.ts",
+    "dev:mainnet": "NODE_OPTIONS='--dns-result-order=ipv4first' tsx watch --env-file=.env.mainnet src/index.ts",
+    "start:degen": "NODE_OPTIONS='--dns-result-order=ipv4first' tsx --env-file=.env src/degenExecutor.ts",
+    "start:degen:mainnet": "NODE_OPTIONS='--dns-result-order=ipv4first' tsx --env-file=.env.mainnet src/degenExecutor.ts"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.31.1",
+    "@solana/spl-token": "^0.4.14",
+    "@solana/web3.js": "^1.98.4",
+    "bn.js": "^5.2.1",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/bn.js": "^5.1.6",
+    "@types/node": "^22.13.4",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}

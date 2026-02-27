@@ -1,0 +1,11 @@
+[package]
+name = "token-stub-program"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "token_stub_program"
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+pinocchio = "0.10"

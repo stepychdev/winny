@@ -1,0 +1,119 @@
+# Rust / Cargo
+target/
+**/*.rs.bk
+# Cargo.lock - обычно коммитится в Anchor проектах
+
+# Anchor
+.anchor/
+target/
+test-ledger/
+
+# Node.js / TypeScript
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+.npm
+.yarn/
+.pnp.*
+.yarn-integrity
+
+# Environment variables
+.env
+.env.mainnet
+.env.local
+.env.*.local
+*.env
+
+# Keys and secrets
+*.key
+*.pem
+*.p12
+*.keypair
+deployer-keypair.json
+deployer_keypair*.json
+wallet.json
+id.json
+service-wallet.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+.temp/
+
+# Build artifacts
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Vite
+*.local
+.vite/
+
+# ESLint
+.eslintcache
+
+# Claude (keep skills for the team, ignore the rest)
+.claude/*
+!.claude/skills/
+
+# IDL (optional - uncomment if you don't want to commit IDL)
+# target/idl/
+# target/types/
+keypar.json
+.mcp.json
+.vercel
+.stitch/
+SESSION_REPORT.md
+LAST_SESSION.md
+
+# Mainnet rollout local secrets/artifacts (never commit)
+private_keys_miltisig.json
+multisig-signer*.json
+squads_mainnet_out.json
+jackpot_anchor_v4/mainnet-*-keypair.json
+
+# Mainnet keypairs
+mainnet-program-keypair.json
+mainnet-buffer-keypair.json
+squads_mainnet_out.json
+.env*.local
+
+# local secrets
+.env.devnet
+jackpot_pinocchio_poc/devnet-keys/

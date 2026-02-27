@@ -1,0 +1,58 @@
+{
+  "mainnet": {
+    "created_at_utc": "2026-02-24T15:24:25.452Z",
+    "program": {
+      "jackpot_program_id": "3wi11KBqF3Qa7JPP6CH4AFrcXbvaYEXMsEr9cmWQy8Zj",
+      "program_data": "5AETin9W2SxCLgWfFfzjZ7zRHQnXnqA3vEeNEwSc3Vno",
+      "upgrade_authority_vault": "6qZXVsmJVV5WYWMmpwympY1JZrpVGzKYJEqTa2VkJXFW"
+    },
+    "protocol_config": {
+      "config_pda": "AiSAQcaTTDop85B6vYjv8yYn3rkA9qwWZfiRPRJjhPi4",
+      "admin_vault": "D4DBCi5ASYf4EinyLJUsKbEzxYoNiAY9bY9aXeXh1ym",
+      "treasury_usdc_token_account": "8dccLsxnj9jwfEeokJrQH2wioJz4sS3mEQGd3miWB5YE",
+      "usdc_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+    },
+    "squads": {
+      "program_config_pda": "BSTq9w3kZwNwpBXJEvTZz2G9ZTNyKBvoSeXMvwb4cNZr",
+      "protocol_treasury": "5DH2e3cJmFpyi6mk65EGFediunm4ui6BiKNUNrhWtD1b",
+      "members_2_of_3": [
+        "5mjKaFPXX6J4vmcyS1W7u8ostx5Rt1A9knigbpjnQof5",
+        "B4RSFCHfHGspoXRu4FnfYXM6s7GEYkQfsJeDm9ABMzjJ",
+        "5LfW3pcGZFfWkfiaZNKmbw4tZT7K1YnKXFgUBwE3yq7c"
+      ],
+      "ops": {
+        "multisig_pda": "GJFvhkxMyHCB6KhZpdaLgDk4k7hCfGpSQVQt4VcHG5EA",
+        "vault_pda_index_0": "D4DBCi5ASYf4EinyLJUsKbEzxYoNiAY9bY9aXeXh1ym",
+        "timelock_sec": 0,
+        "create_signature": "8gx87SjESf7f3bdSMGcEUqCTc7KfGTr5kfQsiftTzQgtFi6dCp9n9KDByF7FXqcuyUrychcw1J2hxci61EFYeR5"
+      },
+      "upgrade": {
+        "multisig_pda": "Fpw43sfnsXCixHaBNw8uyYYJHZd8d48dhiaTNLXdAUmD",
+        "vault_pda_index_0": "6qZXVsmJVV5WYWMmpwympY1JZrpVGzKYJEqTa2VkJXFW",
+        "timelock_sec": 43200,
+        "create_signature": "4wXkVqQdzt3A6EHStQPULwSmaUjJj5aNdAHVQv9omUQBHrDEkNtBCbrdZSZGZKE7EED9ZiwbGdbWAub2yaMbnx2q"
+      }
+    },
+    "migration_signatures": {
+      "program_upgrade_deploy": "3oa8SYZYQXWfL2e65dkBdGZCLpR7NNdbzcBdAtCqq8udtnqWTFfJJsGG1sohpsrBnGoDY2unSbUhqeQhLKLyk2NA",
+      "program_cleanup_buffer_write": "7dDQ4ZMNWxH4jk9dYftprqcxDWn8trhgszwv4pf8MBaZ",
+      "program_cleanup_buffer_set_authority": "2FXtEDFygy6NBBkrhRc3VXaMv3SXhcZYbHHNBo9CQ3UHDJBQ1jE5EQuEgPNJTyRULUAcRpsQBuRJXPvKuuYpCm98",
+      "program_cleanup_upgrade_vault_tx_create": "tqXfQx2ZteDGRmJ7UJgwq3mEJicowkfQdXDWdyzEawR2A7dpF1X6jmpMNkoAA25Pvi78AsX32TuuvBEsi8zmyhG",
+      "program_cleanup_upgrade_proposal_create": "29Usfv9gEz59yXKMaXq1Lm76UrB58ceNNDZeurWnfTNwa9Q93kFxSmh49yru1B38ZDaSLViUuJBf2F6wkuQaLHbn",
+      "program_cleanup_upgrade_approve_1": "X3zm1bcZv8crJ5jMqiv5Fzg2YMXw7mWcjqr6Qs47BdcrVo1SZA7paWUYNb6dSL9RarbSa9mmG9TjiytNj2qFWEk",
+      "program_cleanup_upgrade_approve_2": "2w1QbUw3Qpxgy5KgWEHJ2hZoYaNK1khbnu6zmYeuaqvTufD72KyGb8fiVTEY7LFyt4Bn5R3ntousa635K7R1m2oV",
+      "program_cleanup_upgrade_execute_attempt": "4fKc57aNMiqiJ6mJxZUwn8iCtoi7CaUuZubY3i7vPVYLsDbbuSkF3TaDRZAncJLfdRtCke7owSUQ9ccSW78yPGaW",
+      "create_ops_treasury_token_account": "3AZZBtfMRG4U7kkUCNVoD14YuGQb8iX92heZwTJxeeGSo32b75TzfrGaKwtKwQKDHtVn2fMK86tM5wAt947VZEqD",
+      "set_treasury_usdc_ata": "",
+      "transfer_admin": "5R4gDZXyrZLBMBFzsSGUxk59wnao129yxA879qC58mZF3Y9D2ypNwf2jyhPQQ6njiYqrSz59yFkxfoXbRp73qiPa",
+      "smoke_pause_true_execute": "5XuG7d1LdGZT4ckR4cE6F9HWSrvi4ywgbiAptK2GVAh5HidWyE4Lj3odFrmFmQ2mao6sBPzDRDfrXTq2Jwsf9Nmx",
+      "smoke_pause_false_execute": "3gcjSND8VJR2sQRahVNjeqxC6fkjFCdatD7VfSK9TW8iUsii54yow42YMhD9f4ghExFBFwyhEde3M4kgPxi35xrM",
+      "smoke_upgrade_noop_execute": "3JTdoi7HkYv1w2R3obdNEj4SKrmiT549phvKp995kngAyKYRJ8hceQQctFuuBj4rWyKm6TMttPiXhFgj3y5dbbKb"
+    },
+    "notes": {
+      "status": "fill during mainnet rollout",
+      "release_sha": "",
+      "rollout_runbook": "MAINNET_ROLLOUT.md"
+    }
+  }
+}

@@ -1,0 +1,3504 @@
+{
+  "address": "3wi11KBqF3Qa7JPP6CH4AFrcXbvaYEXMsEr9cmWQy8Zj",
+  "metadata": {
+    "name": "jackpot",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Any-token on-chain jackpot MVP"
+  },
+  "instructions": [
+    {
+      "name": "admin_force_cancel",
+      "docs": [
+        "Admin force-cancel: mark round as Cancelled (vault funds stay in escrow for refunds)."
+      ],
+      "discriminator": [
+        101,
+        52,
+        0,
+        153,
+        168,
+        111,
+        252,
+        170
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  102,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "round_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "auto_claim",
+      "docs": [
+        "Anyone can trigger claim — funds go to the on-chain winner."
+      ],
+      "discriminator": [
+        184,
+        222,
+        148,
+        135,
+        212,
+        37,
+        111,
+        148
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  102,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_usdc_ata",
+          "docs": [
+            "Vault USDC ATA owned by the round PDA."
+          ],
+          "writable": true
+        },
+        {
+          "name": "winner_usdc_ata",
+          "docs": [
+            "Winner's USDC ATA — validated in handler against round.winner."
+          ],
+          "writable": true
+        },
+        {
+          "name": "treasury_usdc_ata",
+          "writable": true
+        },
+        {
+          "name": "vrf_payer_usdc_ata",
+          "docs": [
+            "Optional: VRF payer's USDC ATA for reimbursement."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "round_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "begin_degen_execution",
+      "discriminator": [
+        225,
+        136,
+        119,
+        185,
+        1,
+        141,
+        201,
+        76
+      ],
+      "accounts": [
+        {
+          "name": "executor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  102,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "degen_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  103,
+                  101,
+                  110,
+                  95,
+                  99,
+                  102,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "degen_claim",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  103,
+                  101,
+                  110,
+                  95,
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              },
+              {
+                "kind": "account",
+                "path": "degen_claim.winner",
+                "account": "DegenClaim"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_usdc_ata",
+          "writable": true
+        },
+        {
+          "name": "executor_usdc_ata",
+          "writable": true
+        },
+        {
+          "name": "treasury_usdc_ata",
+          "writable": true
+        },
+        {
+          "name": "vrf_payer_authority",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "vrf_payer_usdc_ata",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "selected_token_mint"
+        },
+        {
+          "name": "receiver_token_ata",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "round_id",
+          "type": "u64"
+        },
+        {
+          "name": "candidate_rank",
+          "type": "u8"
+        },
+        {
+          "name": "token_index",
+          "type": "u32"
+        },
+        {
+          "name": "min_out_raw",
+          "type": "u64"
+        },
+        {
+          "name": "route_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "cancel_round",
+      "docs": [
+        "Cancel participation — refund USDC from vault while round is still Open."
+      ],
+      "discriminator": [
+        82,
+        70,
+        134,
+        54,
+        46,
+        96,
+        148,
+        8
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  102,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "participant",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "round"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_usdc_ata",
+          "docs": [
+            "Vault USDC ATA owned by the round PDA."
+          ],
+          "writable": true
+        },
+        {
+          "name": "user_usdc_ata",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "round_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "claim",
+      "discriminator": [
+        62,
+        198,
+        214,
+        193,
+        213,
+        159,
+        108,
+        210
+      ],
+      "accounts": [
+        {
+          "name": "winner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  102,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_usdc_ata",
+          "docs": [
+            "Vault USDC ATA owned by the round PDA — verified in handler."
+          ],
+          "writable": true
+        },
+        {
+          "name": "winner_usdc_ata",
+          "writable": true
+        },
+        {
+          "name": "treasury_usdc_ata",
+          "writable": true
+        },
+        {
+          "name": "vrf_payer_usdc_ata",
+          "docs": [
+            "Optional: VRF payer's USDC ATA for reimbursement."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "round_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "claim_degen_fallback",
+      "discriminator": [
+        59,
+        118,
+        54,
+        126,
+        27,
+        58,
+        54,
+        126
+      ],
+      "accounts": [
+        {
+          "name": "winner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  102,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "degen_claim",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  103,
+                  101,
+                  110,
+                  95,
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              },
+              {
+                "kind": "account",
+                "path": "winner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_usdc_ata",
+          "writable": true
+        },
+        {
+          "name": "winner_usdc_ata",
+          "writable": true
+        },
+        {
+          "name": "treasury_usdc_ata",
+          "writable": true
+        },
+        {
+          "name": "vrf_payer_authority",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "vrf_payer_usdc_ata",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "round_id",
+          "type": "u64"
+        },
+        {
+          "name": "fallback_reason",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "claim_refund",
+      "docs": [
+        "[H-2 fix] Participant self-refund from a force-cancelled round (escrow pattern)."
+      ],
+      "discriminator": [
+        15,
+        16,
+        30,
+        161,
+        255,
+        228,
+        97,
+        60
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "docs": [
+            "Participant self-service refund."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  102,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "participant",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "round"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_usdc_ata",
+          "docs": [
+            "Vault USDC ATA owned by the round PDA."
+          ],
+          "writable": true
+        },
+        {
+          "name": "user_usdc_ata",
+          "docs": [
+            "User's USDC ATA to receive the refund."
+          ],
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "round_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "close_participant",
+      "docs": [
+        "Close a participant PDA after round is Claimed/Cancelled. Returns rent to participant."
+      ],
+      "discriminator": [
+        192,
+        162,
+        92,
+        5,
+        148,
+        191,
+        207,
+        151
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Anyone can call (typically crank service)."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "user",
+          "docs": [
+            "The participant's wallet — receives the rent lamports."
+          ],
+          "writable": true
+        },
+        {
+          "name": "round",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "participant",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "round"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "round_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "close_round",
+      "docs": [
+        "Close round account + vault ATA after Claimed/Cancelled. Returns rent to recipient."
+      ],
+      "discriminator": [
+        149,
+        14,
+        81,
+        88,
+        230,
+        226,
+        234,
+        37
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Anyone can call, but rent goes to `recipient`."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "recipient",
+          "docs": [
+            "Where the recovered rent lamports go."
+          ],
+          "writable": true
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_usdc_ata",
+          "docs": [
+            "Vault USDC ATA owned by the round PDA — must be empty."
+          ],
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "round_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "degen_vrf_callback",
+      "discriminator": [
+        176,
+        85,
+        246,
+        97,
+        38,
+        231,
+        83,
+        194
+      ],
+      "accounts": [
+        {
+          "name": "vrf_program_identity",
+          "signer": true,
+          "address": "9irBy75QS2BN81FUgXuHcjqceJJRuc9oDkAe8TKVvvAw"
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  102,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "docs": [
+            "No seeds constraint here: callback does not include round_id arg."
+          ],
+          "writable": true
+        },
+        {
+          "name": "degen_claim",
+          "writable": true
+        },
+        {
+          "name": "degen_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  103,
+                  101,
+                  110,
+                  95,
+                  99,
+                  102,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "randomness",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "deposit_any",
+      "discriminator": [
+        220,
+        235,
+        160,
+        171,
+        97,
+        63,
+        2,
+        54
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  102,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "participant",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "round"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_usdc_ata",
+          "writable": true
+        },
+        {
+          "name": "vault_usdc_ata",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "round_id",
+          "type": "u64"
+        },
+        {
+          "name": "usdc_balance_before",
+          "type": "u64"
+        },
+        {
+          "name": "min_out",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "finalize_degen_success",
+      "discriminator": [
+        130,
+        172,
+        55,
+        172,
+        82,
+        96,
+        37,
+        2
+      ],
+      "accounts": [
+        {
+          "name": "executor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "degen_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  103,
+                  101,
+                  110,
+                  95,
+                  99,
+                  102,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "degen_claim",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  103,
+                  101,
+                  110,
+                  95,
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              },
+              {
+                "kind": "account",
+                "path": "degen_claim.winner",
+                "account": "DegenClaim"
+              }
+            ]
+          }
+        },
+        {
+          "name": "executor_usdc_ata",
+          "writable": true
+        },
+        {
+          "name": "receiver_token_ata",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "round_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "init_config",
+      "discriminator": [
+        23,
+        235,
+        115,
+        232,
+        168,
+        96,
+        1,
+        231
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  102,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "InitConfigArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "lock_round",
+      "discriminator": [
+        68,
+        124,
+        43,
+        230,
+        30,
+        44,
+        248,
+        227
+      ],
+      "accounts": [
+        {
+          "name": "caller",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  102,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "round_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "request_degen_vrf",
+      "discriminator": [
+        108,
+        55,
+        104,
+        54,
+        61,
+        42,
+        6,
+        194
+      ],
+      "accounts": [
+        {
+          "name": "winner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  102,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "degen_claim",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  103,
+                  101,
+                  110,
+                  95,
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              },
+              {
+                "kind": "account",
+                "path": "winner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "program_identity",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "oracle_queue",
+          "writable": true,
+          "address": "Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh"
+        },
+        {
+          "name": "vrf_program",
+          "address": "Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz"
+        },
+        {
+          "name": "slot_hashes",
+          "address": "SysvarS1otHashes111111111111111111111111111"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "round_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "request_vrf",
+      "discriminator": [
+        5,
+        87,
+        79,
+        152,
+        164,
+        176,
+        190,
+        226
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  102,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "program_identity",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "oracle_queue",
+          "writable": true,
+          "address": "Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh"
+        },
+        {
+          "name": "vrf_program",
+          "address": "Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz"
+        },
+        {
+          "name": "slot_hashes",
+          "address": "SysvarS1otHashes111111111111111111111111111"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "round_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "set_treasury_usdc_ata",
+      "discriminator": [
+        138,
+        174,
+        194,
+        191,
+        218,
+        234,
+        42,
+        181
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  102,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "new_treasury_usdc_ata"
+        },
+        {
+          "name": "expected_owner"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "start_round",
+      "discriminator": [
+        144,
+        144,
+        43,
+        7,
+        193,
+        42,
+        217,
+        215
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  102,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_usdc_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "round"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "usdc_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "round_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "transfer_admin",
+      "discriminator": [
+        42,
+        242,
+        66,
+        106,
+        228,
+        10,
+        111,
+        156
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  102,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_admin",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "update_config",
+      "discriminator": [
+        29,
+        158,
+        252,
+        191,
+        10,
+        83,
+        219,
+        99
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  102,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "UpdateConfigArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "upsert_degen_config",
+      "discriminator": [
+        22,
+        35,
+        13,
+        127,
+        83,
+        196,
+        215,
+        174
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  102,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "degen_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  103,
+                  101,
+                  110,
+                  95,
+                  99,
+                  102,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "UpsertDegenConfigArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "vrf_callback",
+      "discriminator": [
+        248,
+        224,
+        55,
+        227,
+        56,
+        10,
+        108,
+        36
+      ],
+      "accounts": [
+        {
+          "name": "vrf_program_identity",
+          "docs": [
+            "VRF program identity PDA — only the VRF program can produce this signature."
+          ],
+          "signer": true,
+          "address": "9irBy75QS2BN81FUgXuHcjqceJJRuc9oDkAe8TKVvvAw"
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  102,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "docs": [
+            "No seeds constraint — round_id not available from VRF callback args.",
+            "PDA verified manually in handler."
+          ],
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "randomness",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Config",
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
+    },
+    {
+      "name": "DegenClaim",
+      "discriminator": [
+        234,
+        130,
+        179,
+        110,
+        12,
+        221,
+        188,
+        213
+      ]
+    },
+    {
+      "name": "DegenConfig",
+      "discriminator": [
+        1,
+        13,
+        207,
+        202,
+        167,
+        157,
+        122,
+        103
+      ]
+    },
+    {
+      "name": "Participant",
+      "discriminator": [
+        32,
+        142,
+        108,
+        79,
+        247,
+        179,
+        54,
+        6
+      ]
+    },
+    {
+      "name": "Round",
+      "discriminator": [
+        87,
+        127,
+        165,
+        51,
+        73,
+        78,
+        116,
+        174
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "AdminTransferred",
+      "discriminator": [
+        255,
+        147,
+        182,
+        5,
+        199,
+        217,
+        38,
+        179
+      ]
+    },
+    {
+      "name": "CancelRefund",
+      "discriminator": [
+        14,
+        141,
+        117,
+        101,
+        3,
+        90,
+        1,
+        145
+      ]
+    },
+    {
+      "name": "Claimed",
+      "discriminator": [
+        217,
+        192,
+        123,
+        72,
+        108,
+        150,
+        248,
+        33
+      ]
+    },
+    {
+      "name": "DegenClaimed",
+      "discriminator": [
+        170,
+        77,
+        179,
+        164,
+        244,
+        200,
+        96,
+        122
+      ]
+    },
+    {
+      "name": "DegenExecutionFinalized",
+      "discriminator": [
+        6,
+        82,
+        171,
+        97,
+        146,
+        19,
+        41,
+        200
+      ]
+    },
+    {
+      "name": "DegenExecutionStarted",
+      "discriminator": [
+        247,
+        151,
+        192,
+        231,
+        125,
+        125,
+        84,
+        188
+      ]
+    },
+    {
+      "name": "DegenFallbackClaimed",
+      "discriminator": [
+        177,
+        136,
+        86,
+        215,
+        141,
+        226,
+        223,
+        140
+      ]
+    },
+    {
+      "name": "DegenVrfFulfilled",
+      "discriminator": [
+        12,
+        205,
+        144,
+        69,
+        52,
+        86,
+        109,
+        131
+      ]
+    },
+    {
+      "name": "DegenVrfRequested",
+      "discriminator": [
+        199,
+        186,
+        71,
+        176,
+        145,
+        14,
+        130,
+        51
+      ]
+    },
+    {
+      "name": "DepositEvent",
+      "discriminator": [
+        120,
+        248,
+        61,
+        83,
+        31,
+        142,
+        107,
+        144
+      ]
+    },
+    {
+      "name": "ForceCancel",
+      "discriminator": [
+        121,
+        83,
+        177,
+        59,
+        234,
+        80,
+        112,
+        101
+      ]
+    },
+    {
+      "name": "RoundLocked",
+      "discriminator": [
+        19,
+        58,
+        91,
+        157,
+        24,
+        76,
+        207,
+        7
+      ]
+    },
+    {
+      "name": "RoundSettled",
+      "discriminator": [
+        249,
+        225,
+        66,
+        54,
+        157,
+        200,
+        234,
+        222
+      ]
+    },
+    {
+      "name": "RoundStarted",
+      "discriminator": [
+        180,
+        209,
+        2,
+        244,
+        238,
+        48,
+        170,
+        120
+      ]
+    },
+    {
+      "name": "TreasuryUpdated",
+      "discriminator": [
+        80,
+        239,
+        54,
+        168,
+        43,
+        38,
+        85,
+        145
+      ]
+    },
+    {
+      "name": "VrfRequested",
+      "discriminator": [
+        50,
+        56,
+        125,
+        141,
+        222,
+        176,
+        113,
+        18
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Paused",
+      "msg": "Protocol is paused"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidFeeBps",
+      "msg": "Invalid fee bps"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidTicketUnit",
+      "msg": "Invalid ticket unit"
+    },
+    {
+      "code": 6003,
+      "name": "RoundNotOpen",
+      "msg": "Round is not open"
+    },
+    {
+      "code": 6004,
+      "name": "RoundNotLocked",
+      "msg": "Round is not locked"
+    },
+    {
+      "code": 6005,
+      "name": "RoundNotVrfRequested",
+      "msg": "Round is not in VRF requested state"
+    },
+    {
+      "code": 6006,
+      "name": "RoundNotSettled",
+      "msg": "Round is not settled"
+    },
+    {
+      "code": 6007,
+      "name": "RoundAlreadyClaimed",
+      "msg": "Round already claimed"
+    },
+    {
+      "code": 6008,
+      "name": "NoDepositsYet",
+      "msg": "Round has no deposits yet"
+    },
+    {
+      "code": 6009,
+      "name": "NotEnoughParticipants",
+      "msg": "Not enough participants"
+    },
+    {
+      "code": 6010,
+      "name": "NotEnoughTickets",
+      "msg": "Not enough tickets"
+    },
+    {
+      "code": 6011,
+      "name": "RoundNotEnded",
+      "msg": "Round countdown has not ended"
+    },
+    {
+      "code": 6012,
+      "name": "InvalidVault",
+      "msg": "Invalid vault account"
+    },
+    {
+      "code": 6013,
+      "name": "InvalidTreasury",
+      "msg": "Invalid treasury account"
+    },
+    {
+      "code": 6014,
+      "name": "InvalidUserUsdcAta",
+      "msg": "Invalid user USDC ATA"
+    },
+    {
+      "code": 6015,
+      "name": "InvalidUsdcBalanceBefore",
+      "msg": "USDC balance decreased unexpectedly before deposit"
+    },
+    {
+      "code": 6016,
+      "name": "SlippageExceeded",
+      "msg": "Received USDC is below min_out"
+    },
+    {
+      "code": 6017,
+      "name": "DepositTooSmall",
+      "msg": "Deposit too small to mint at least one ticket"
+    },
+    {
+      "code": 6018,
+      "name": "MaxParticipantsReached",
+      "msg": "Too many participants for MVP limit"
+    },
+    {
+      "code": 6019,
+      "name": "OnlyWinnerCanClaim",
+      "msg": "Only winner can claim"
+    },
+    {
+      "code": 6020,
+      "name": "MathOverflow",
+      "msg": "Math overflow"
+    },
+    {
+      "code": 6021,
+      "name": "Unauthorized",
+      "msg": "Unauthorized"
+    },
+    {
+      "code": 6022,
+      "name": "RoundNotCancellable",
+      "msg": "Round is not cancellable"
+    },
+    {
+      "code": 6023,
+      "name": "NoDepositToRefund",
+      "msg": "No deposit to refund"
+    },
+    {
+      "code": 6024,
+      "name": "AlreadyRefunded",
+      "msg": "Already refunded"
+    },
+    {
+      "code": 6025,
+      "name": "RoundNotCloseable",
+      "msg": "Round is not in a closeable state (must be Claimed or Cancelled)"
+    },
+    {
+      "code": 6026,
+      "name": "VaultNotEmpty",
+      "msg": "Vault still has tokens — cannot close"
+    },
+    {
+      "code": 6027,
+      "name": "RoundExpired",
+      "msg": "Round timer has expired — no more deposits accepted"
+    },
+    {
+      "code": 6028,
+      "name": "InvalidRoundDuration",
+      "msg": "Invalid round duration (must be > 0)"
+    },
+    {
+      "code": 6029,
+      "name": "ParticipantRoundMismatch",
+      "msg": "Participant does not belong to this round"
+    },
+    {
+      "code": 6030,
+      "name": "MaxDepositExceeded",
+      "msg": "Deposit exceeds max per-user limit for this round"
+    },
+    {
+      "code": 6031,
+      "name": "InvalidAdmin",
+      "msg": "Invalid admin address"
+    },
+    {
+      "code": 6032,
+      "name": "ParticipantNotEmpty",
+      "msg": "Participant still has refundable balance or tickets"
+    },
+    {
+      "code": 6033,
+      "name": "CancelNotAllowed",
+      "msg": "Cannot cancel — other participants have deposits in this round"
+    },
+    {
+      "code": 6034,
+      "name": "DegenClaimLocked",
+      "msg": "Classic claim is locked because degen mode was selected"
+    },
+    {
+      "code": 6035,
+      "name": "DegenVrfNotRequested",
+      "msg": "Degen VRF has not been requested for this round"
+    },
+    {
+      "code": 6036,
+      "name": "DegenVrfNotReady",
+      "msg": "Degen VRF is not ready yet"
+    },
+    {
+      "code": 6037,
+      "name": "DegenAlreadyRequested",
+      "msg": "Degen VRF was already requested"
+    },
+    {
+      "code": 6038,
+      "name": "DegenAlreadyClaimed",
+      "msg": "Degen claim was already completed"
+    },
+    {
+      "code": 6039,
+      "name": "InvalidDegenClaim",
+      "msg": "Invalid degen claim account"
+    },
+    {
+      "code": 6040,
+      "name": "InvalidDegenCandidate",
+      "msg": "Invalid degen candidate selection"
+    },
+    {
+      "code": 6041,
+      "name": "UnauthorizedDegenExecutor",
+      "msg": "Unauthorized degen executor"
+    },
+    {
+      "code": 6042,
+      "name": "InvalidDegenExecutionState",
+      "msg": "Invalid degen execution state"
+    },
+    {
+      "code": 6043,
+      "name": "InvalidDegenExecutorAta",
+      "msg": "Invalid degen executor ATA"
+    },
+    {
+      "code": 6044,
+      "name": "InvalidDegenReceiverAta",
+      "msg": "Invalid receiver token ATA"
+    },
+    {
+      "code": 6045,
+      "name": "InvalidVrfPayerAta",
+      "msg": "Invalid VRF payer USDC ATA"
+    },
+    {
+      "code": 6046,
+      "name": "DegenOutputNotReceived",
+      "msg": "Degen output was not received"
+    },
+    {
+      "code": 6047,
+      "name": "DegenFallbackTooEarly",
+      "msg": "Degen fallback is not yet available"
+    }
+  ],
+  "types": [
+    {
+      "name": "AdminTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CancelRefund",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "usdc_refunded",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Claimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "winner",
+            "type": "pubkey"
+          },
+          {
+            "name": "payout",
+            "type": "u64"
+          },
+          {
+            "name": "fee",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "usdc_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury_usdc_ata",
+            "type": "pubkey"
+          },
+          {
+            "name": "fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "ticket_unit",
+            "type": "u64"
+          },
+          {
+            "name": "round_duration_sec",
+            "type": "u32"
+          },
+          {
+            "name": "min_participants",
+            "type": "u16"
+          },
+          {
+            "name": "min_total_tickets",
+            "type": "u64"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "max_deposit_per_user",
+            "docs": [
+              "Max USDC (raw, 6 decimals) a single participant can deposit per round. 0 = unlimited."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                24
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DegenClaim",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round",
+            "type": "pubkey"
+          },
+          {
+            "name": "winner",
+            "type": "pubkey"
+          },
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "selected_candidate_rank",
+            "type": "u8"
+          },
+          {
+            "name": "fallback_reason",
+            "type": "u8"
+          },
+          {
+            "name": "token_index",
+            "type": "u32"
+          },
+          {
+            "name": "pool_version",
+            "type": "u32"
+          },
+          {
+            "name": "candidate_window",
+            "type": "u8"
+          },
+          {
+            "name": "_padding0",
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          },
+          {
+            "name": "requested_at",
+            "type": "i64"
+          },
+          {
+            "name": "fulfilled_at",
+            "type": "i64"
+          },
+          {
+            "name": "claimed_at",
+            "type": "i64"
+          },
+          {
+            "name": "fallback_after_ts",
+            "type": "i64"
+          },
+          {
+            "name": "payout_raw",
+            "type": "u64"
+          },
+          {
+            "name": "min_out_raw",
+            "type": "u64"
+          },
+          {
+            "name": "receiver_pre_balance",
+            "type": "u64"
+          },
+          {
+            "name": "token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "executor",
+            "type": "pubkey"
+          },
+          {
+            "name": "receiver_token_ata",
+            "type": "pubkey"
+          },
+          {
+            "name": "randomness",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "route_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DegenClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "winner",
+            "type": "pubkey"
+          },
+          {
+            "name": "payout",
+            "type": "u64"
+          },
+          {
+            "name": "fee",
+            "type": "u64"
+          },
+          {
+            "name": "candidate_rank",
+            "type": "u8"
+          },
+          {
+            "name": "token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_index",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DegenConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "executor",
+            "type": "pubkey"
+          },
+          {
+            "name": "fallback_timeout_sec",
+            "type": "u32"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                27
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DegenExecutionFinalized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "winner",
+            "type": "pubkey"
+          },
+          {
+            "name": "executor",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_index",
+            "type": "u32"
+          },
+          {
+            "name": "candidate_rank",
+            "type": "u8"
+          },
+          {
+            "name": "min_out_raw",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DegenExecutionStarted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "winner",
+            "type": "pubkey"
+          },
+          {
+            "name": "executor",
+            "type": "pubkey"
+          },
+          {
+            "name": "payout_raw",
+            "type": "u64"
+          },
+          {
+            "name": "min_out_raw",
+            "type": "u64"
+          },
+          {
+            "name": "candidate_rank",
+            "type": "u8"
+          },
+          {
+            "name": "token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_index",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DegenFallbackClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "winner",
+            "type": "pubkey"
+          },
+          {
+            "name": "payout",
+            "type": "u64"
+          },
+          {
+            "name": "fee",
+            "type": "u64"
+          },
+          {
+            "name": "fallback_reason",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DegenVrfFulfilled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "winner",
+            "type": "pubkey"
+          },
+          {
+            "name": "degen_claim",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool_version",
+            "type": "u32"
+          },
+          {
+            "name": "candidate_window",
+            "type": "u8"
+          },
+          {
+            "name": "payout_raw",
+            "type": "u64"
+          },
+          {
+            "name": "fallback_after_ts",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DegenVrfRequested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "winner",
+            "type": "pubkey"
+          },
+          {
+            "name": "degen_claim",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DepositEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "delta_usdc",
+            "type": "u64"
+          },
+          {
+            "name": "tickets_added",
+            "type": "u64"
+          },
+          {
+            "name": "participant_index",
+            "type": "u16"
+          },
+          {
+            "name": "total_usdc_after",
+            "type": "u64"
+          },
+          {
+            "name": "total_tickets_after",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FenwickTree",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "data",
+            "type": {
+              "array": [
+                "u64",
+                201
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ForceCancel",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_usdc",
+            "type": "u64"
+          },
+          {
+            "name": "participants_count",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitConfigArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "usdc_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury_usdc_ata",
+            "type": "pubkey"
+          },
+          {
+            "name": "fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "ticket_unit",
+            "type": "u64"
+          },
+          {
+            "name": "round_duration_sec",
+            "type": "u32"
+          },
+          {
+            "name": "min_participants",
+            "type": "u16"
+          },
+          {
+            "name": "min_total_tickets",
+            "type": "u64"
+          },
+          {
+            "name": "max_deposit_per_user",
+            "docs": [
+              "Max USDC (raw) a single user can deposit per round. 0 = unlimited."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Participant",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round",
+            "type": "pubkey"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "index",
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "tickets_total",
+            "type": "u64"
+          },
+          {
+            "name": "usdc_total",
+            "type": "u64"
+          },
+          {
+            "name": "deposits_count",
+            "type": "u32"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ParticipantsArray",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "data",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                200
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Round",
+      "docs": [
+        "Round account — zero-copy to avoid stack overflow (~21KB).",
+        "All instructions must use `AccountLoader<'info, Round>` and call `.load()` / `.load_mut()`."
+      ],
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "_padding",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
+          },
+          {
+            "name": "start_ts",
+            "type": "i64"
+          },
+          {
+            "name": "end_ts",
+            "type": "i64"
+          },
+          {
+            "name": "first_deposit_ts",
+            "type": "i64"
+          },
+          {
+            "name": "vault_usdc_ata",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "total_usdc",
+            "type": "u64"
+          },
+          {
+            "name": "total_tickets",
+            "type": "u64"
+          },
+          {
+            "name": "participants_count",
+            "type": "u16"
+          },
+          {
+            "name": "_padding2",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
+          },
+          {
+            "name": "randomness",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "winning_ticket",
+            "type": "u64"
+          },
+          {
+            "name": "winner",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "participants",
+            "type": {
+              "defined": {
+                "name": "ParticipantsArray"
+              }
+            }
+          },
+          {
+            "name": "bit",
+            "type": {
+              "defined": {
+                "name": "FenwickTree"
+              }
+            }
+          },
+          {
+            "name": "vrf_payer",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "vrf_reimbursed",
+            "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                31
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "RoundLocked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "total_usdc",
+            "type": "u64"
+          },
+          {
+            "name": "total_tickets",
+            "type": "u64"
+          },
+          {
+            "name": "participants_count",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RoundSettled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "winning_ticket",
+            "type": "u64"
+          },
+          {
+            "name": "winner",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_usdc",
+            "type": "u64"
+          },
+          {
+            "name": "total_tickets",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RoundStarted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "round",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault_usdc_ata",
+            "type": "pubkey"
+          },
+          {
+            "name": "start_ts",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TreasuryUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateConfigArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fee_bps",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "ticket_unit",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "round_duration_sec",
+            "type": {
+              "option": "u32"
+            }
+          },
+          {
+            "name": "min_participants",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "min_total_tickets",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "paused",
+            "type": {
+              "option": "bool"
+            }
+          },
+          {
+            "name": "max_deposit_per_user",
+            "docs": [
+              "Max USDC (raw) per user per round. 0 = unlimited."
+            ],
+            "type": {
+              "option": "u64"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpsertDegenConfigArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "executor",
+            "type": "pubkey"
+          },
+          {
+            "name": "fallback_timeout_sec",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VrfRequested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ]
+}

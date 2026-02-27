@@ -1,0 +1,32 @@
+{
+  "rules": [
+    {
+      "pathPattern": "/",
+      "apiPath": "/api/actions/round"
+    },
+    {
+      "pathPattern": "/history/round/*",
+      "apiPath": "/api/actions/round?roundId=*"
+    },
+    {
+      "pathPattern": "/join",
+      "apiPath": "/api/actions/join"
+    },
+    {
+      "pathPattern": "/join-batch",
+      "apiPath": "/api/actions/join-batch"
+    },
+    {
+      "pathPattern": "/claim",
+      "apiPath": "/api/actions/claim"
+    },
+    {
+      "pathPattern": "/degen-claim",
+      "apiPath": "/api/actions/claim-degen"
+    },
+    {
+      "pathPattern": "/refund",
+      "apiPath": "/api/actions/claim-refund"
+    }
+  ]
+}

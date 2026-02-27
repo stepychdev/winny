@@ -1,0 +1,133 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-slate-900 dark:bg-[#0f1219] dark:text-slate-100 font-sans antialiased overflow-x-hidden;
+  }
+}
+
+@layer components {
+  .bento-card {
+    background-color: white;
+    border-radius: 2rem;
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  }
+  :is(.dark .bento-card) {
+    background-color: #1e293b;
+  }
+  .bento-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px -4px rgba(13, 89, 242, 0.12);
+  }
+  :is(.dark .bento-card:hover) {
+    box-shadow: 0 10px 30px -4px rgba(13, 89, 242, 0.2);
+  }
+}
+
+@layer utilities {
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Custom thin scrollbar matching dark theme */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(99,102,241,0.35) transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 5px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 6px 0;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(99,102,241,0.3);
+    border-radius: 9999px;
+    transition: background 0.2s;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(99,102,241,0.55);
+  }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-spin-slow {
+  animation: spin-slow 20s linear infinite;
+}
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+@keyframes pulse-gold {
+  0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); border-color: rgba(245, 158, 11, 1); }
+  70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); border-color: rgba(245, 158, 11, 0.6); }
+  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); border-color: rgba(245, 158, 11, 1); }
+}
+.animate-pulse-gold {
+  animation: pulse-gold 2s infinite;
+}
+
+/* ── Live Ticker ── */
+.live-ticker-wrap {
+  position: relative;
+  width: 100%;
+  mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+}
+.live-ticker-track {
+  animation: ticker-scroll 30s linear infinite;
+  width: max-content;
+}
+.live-ticker-track:hover {
+  animation-play-state: paused;
+}
+@keyframes ticker-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* ── Social / Tapestry ── */
+@keyframes social-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+  70% { box-shadow: 0 0 0 4px rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+.social-pulse {
+  animation: social-pulse 2s ease-in-out infinite;
+}
+
+@keyframes social-feed-slide {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.social-feed-item {
+  animation: social-feed-slide 0.3s ease-out both;
+}
+
+@keyframes gradient-x {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+.animate-gradient-x {
+  background-size: 200% 200%;
+  animation: gradient-x 3s ease infinite;
+}
