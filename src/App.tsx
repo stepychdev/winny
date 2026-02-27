@@ -3,6 +3,7 @@ import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { clusterApiUrl } from '@solana/web3.js';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { JackpotProvider } from './contexts/JackpotContext';
@@ -53,6 +54,7 @@ function App() {
             <NavigationProvider>
               <JackpotProvider>
                 <PageRouter />
+                <SpeedInsights />
               </JackpotProvider>
             </NavigationProvider>
           </ThemeProvider>
