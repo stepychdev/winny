@@ -21,7 +21,7 @@ We implemented the full playable game loop:
 - when the timer ends, the round locks
 - MagicBlock VRF is requested
 - winner selection is executed fully on-chain
-- winner claims the pot (or uses Degen Claim Mode)
+- winner claims the pot (or uses Degen Claim Mode (claim random jup token))
 
 Additional systems we built:
 
