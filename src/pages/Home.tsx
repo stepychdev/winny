@@ -118,6 +118,7 @@ export function Home() {
     } catch (e: any) {
       setTxStatus(`Error: ${e.message?.slice(0, 60)}`);
       setTimeout(() => setTxStatus(null), 8000);
+      throw e;
     }
   };
 
@@ -336,7 +337,7 @@ export function Home() {
                 <Button
                   className="mt-4"
                   glow
-                  onClick={() => handleAction(jackpot.claim, 'Claim')}
+                  onClick={() => { handleAction(jackpot.claim, 'Claim').catch(() => {}); }}
                   disabled={jackpot.loading}
                 >
                   <Trophy className="w-4 h-4 mr-2" />
@@ -409,7 +410,7 @@ export function Home() {
               <Button
                 variant="danger"
                 size="sm"
-                onClick={() => handleAction(jackpot.cancelRound, 'Cancel')}
+                onClick={() => { handleAction(jackpot.cancelRound, 'Cancel').catch(() => {}); }}
                 disabled={jackpot.loading}
               >
                 <XCircle className="w-3 h-3 mr-1" /> Cancel & Refund
@@ -426,7 +427,7 @@ export function Home() {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => handleAction(jackpot.claimRefund, 'Claim Refund')}
+                onClick={() => { handleAction(jackpot.claimRefund, 'Claim Refund').catch(() => {}); }}
                 disabled={jackpot.loading}
               >
                 <RefreshCw className="w-3 h-3 mr-1" /> Claim Refund
@@ -480,8 +481,25 @@ export function Home() {
         claiming={jackpot.loading}
         onClaim={async () => {
           await handleAction(jackpot.claim, 'Claim');
+          // Auto-close modal and advance after successful claim
+          setShowWinnerModal(false);
+          setWinnerSnapshot(null);
+          jackpot.setPauseAutoAdvance(false);
+          setDismissedWinnerRound(jackpot.roundId);
+          jackpot.nextRound();
         }}
-        onClaimDegen={async () => jackpot.claimDegen()}
+        onClaimDegen={async () => {
+          const result = await jackpot.claimDegen();
+          // Auto-close modal after a brief delay so user sees the result
+          setTimeout(() => {
+            setShowWinnerModal(false);
+            setWinnerSnapshot(null);
+            jackpot.setPauseAutoAdvance(false);
+            setDismissedWinnerRound(jackpot.roundId);
+            jackpot.nextRound();
+          }, 3000);
+          return result;
+        }}
         degenSeed={winnerSnapshot?.degenSeed ?? null}
         winner={winnerSnapshot}
       />

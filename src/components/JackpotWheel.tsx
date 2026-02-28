@@ -388,10 +388,7 @@ export function JackpotWheel({
     textureRef.current = rebuildTexture(segments, participants);
   }, [rebuildTexture, segments, participants]);
 
-  // ─── Track spinning phase ────────────────────────────
-  useEffect(() => {
-    if (spinning) wasSpinningRef.current = true;
-  }, [spinning]);
+  // ─── Track spinning phase (merged into "Start spinning" effect below) ──
 
   // ─── Trigger landing ─────────────────────────────────
   useEffect(() => {
@@ -598,10 +595,25 @@ export function JackpotWheel({
 
   // ─── Start spinning phase when prop changes ──────────
   useEffect(() => {
-    if (spinning && animRef.current.phase === 'idle') {
-      animRef.current.phase = 'spinning';
-      animRef.current.velocity = 0.02;
+    if (!spinning) return;
+    wasSpinningRef.current = true;
+    const anim = animRef.current;
+    if (anim.phase === 'idle') {
+      anim.phase = 'spinning';
+      anim.velocity = 0.02;
+    } else if (anim.phase === 'celebration' || anim.phase === 'landing') {
+      // New round started while previous round's animation is still playing.
+      // Cut it short and start the new spin immediately.
+      anim.phase = 'spinning';
+      anim.velocity = 0.02;
+      anim.particles = [];
+      frozenSegmentsRef.current = null;
+      frozenTextureRef.current = null;
+      // Rebuild texture with current (new round) participants
+      textureRef.current = rebuildTexture(segments, participants);
     }
+    // If anim.phase is already 'spinning' (e.g. decelerating), the animation
+    // loop will re-accelerate automatically since the `spinning` prop is true.
   }, [spinning]);
 
   // ─── Render ──────────────────────────────────────────

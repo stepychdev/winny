@@ -260,7 +260,7 @@ export function WinnerModal({
                     return;
                   }
                   if (onClaim) {
-                    void onClaim();
+                    onClaim().catch(() => {});
                   }
                 }}
                 disabled={claiming || degenSwapping}
