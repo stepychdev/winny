@@ -3,6 +3,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { MessageCircle, Send, ChevronDown, ChevronUp, Wifi, WifiOff } from 'lucide-react';
 import { useChat, ChatMessage } from '../hooks/useChat';
 import { shortenAddress } from '../mocks';
+import { useNavigation } from '../contexts/NavigationContext';
 
 const COLORS = ['#8b5cf6', '#06b6d4', '#f59e0b', '#ef4444', '#22c55e', '#ec4899', '#3b82f6', '#f97316'];
 
@@ -152,17 +153,19 @@ export function Chat() {
 }
 
 function MessageBubble({ msg, isOwn }: { msg: ChatMessage; isOwn: boolean }) {
+  const { navigateToPlayer } = useNavigation();
   return (
     <div
       className="animate-[fadeSlideIn_0.2s_ease-out]"
     >
       <div className="flex items-baseline gap-1.5 mb-0.5">
-        <span
-          className="text-xs font-bold truncate max-w-[120px]"
+        <button
+          onClick={() => navigateToPlayer(msg.address)}
+          className="text-xs font-bold truncate max-w-[120px] cursor-pointer hover:underline"
           style={{ color: msg.color }}
         >
           {msg.displayName}
-        </span>
+        </button>
         {isOwn && (
           <span className="text-[9px] bg-primary/10 text-primary px-1 py-0.5 rounded-full font-bold leading-none">
             you

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Trophy, X, Loader2, Shuffle, Zap } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { useTapestryProfile } from '../hooks/useTapestryProfile';
+import { useNavigation } from '../contexts/NavigationContext';
 
 interface WinnerModalProps {
   isOpen: boolean;
@@ -51,6 +52,7 @@ export function WinnerModal({
   const [degenStatus, setDegenStatus] = useState<string | null>(null);
   const canClaim = !!isWinner && (!!onClaim || !!onClaimDegen);
   const { profile: winnerSocialProfile } = useTapestryProfile(winner?.address ?? null);
+  const { navigateToPlayer } = useNavigation();
 
   useEffect(() => {
     const handleResize = () =>
@@ -150,7 +152,10 @@ export function WinnerModal({
             Winner!
           </h2>
 
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-primary/10 border border-primary/20 rounded-full mb-6 max-w-full">
+          <button
+            onClick={() => { navigateToPlayer(winner.address); onClose(); }}
+            className="inline-flex items-center gap-2 px-4 py-1.5 bg-primary/10 border border-primary/20 rounded-full mb-6 max-w-full cursor-pointer hover:bg-primary/20 transition-colors"
+          >
             {winnerSocialProfile?.avatarUrl ? (
               <img
                 src={winnerSocialProfile.avatarUrl}
@@ -169,7 +174,7 @@ export function WinnerModal({
             <span className="text-primary/70 font-mono text-[11px] tracking-wide flex-shrink-0">
               {shortAddr}
             </span>
-          </div>
+          </button>
 
           <div className="w-full bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-8 mb-8 border border-slate-100 dark:border-slate-700/50">
             <p className="text-slate-500 dark:text-slate-400 font-semibold text-xs uppercase tracking-[0.2em] mb-2">

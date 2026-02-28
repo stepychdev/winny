@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useJackpotContext } from '../contexts/JackpotContext';
 import { fetchRecentWinnersFromFirebase } from '../lib/roundArchive';
 import { shortenAddr } from '../lib/addressUtils';
+import { useNavigation } from '../contexts/NavigationContext';
 import type { HistoryRound } from '../hooks/useRoundHistory';
 import type { Participant } from '../types';
 
@@ -12,6 +13,7 @@ interface TickerItem {
   tag: TickerTag;
   text: string;
   highlight?: boolean;
+  wallet?: string;
 }
 
 const TAG_STYLES: Record<TickerTag, string> = {
@@ -56,6 +58,7 @@ function buildLiveItems(
       tag: isWhale ? 'WHALE' : 'IN',
       text: `${shortenAddr(p.address)} — $${p.usdcAmount.toFixed(2)}`,
       highlight: isWhale,
+      wallet: p.address,
     });
   });
 
@@ -73,12 +76,14 @@ function buildHistoryItems(winners: HistoryRound[]): TickerItem[] {
       tag: 'WIN' as TickerTag,
       text: `${shortenAddr(r.winner)} won $${r.totalUsdc.toFixed(2)}${multiplier >= 2 ? ` ${multiplier.toFixed(1)}x` : ''}`,
       highlight: r.totalUsdc >= 200 || multiplier >= 5,
+      wallet: r.winner,
     };
   });
 }
 
 export function LiveTicker() {
   const { participants, totalUsdc, roundId, phase } = useJackpotContext();
+  const { navigateToPlayer } = useNavigation();
   const [historyItems, setHistoryItems] = useState<TickerItem[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -118,7 +123,16 @@ export function LiveTicker() {
             >
               {item.tag}
             </span>
-            <span>{item.text}</span>
+            {item.wallet ? (
+              <button
+                onClick={() => navigateToPlayer(item.wallet!)}
+                className="hover:underline cursor-pointer"
+              >
+                {item.text}
+              </button>
+            ) : (
+              <span>{item.text}</span>
+            )}
             <span className="text-slate-300 dark:text-slate-700 mx-1 select-none">/</span>
           </span>
         ))}

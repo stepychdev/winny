@@ -85,7 +85,7 @@ function CopyField({ label, value }: { label: string; value: string }) {
 export default function RoundDetail() {
   const { connection } = useConnection();
   const { publicKey, sendTransaction } = useWallet();
-  const { navigate, roundDetailId } = useNavigation();
+  const { navigate, roundDetailId, navigateToPlayer } = useNavigation();
   const [roundData, setRoundData] = useState<RoundData | null>(null);
   const [archivedRound, setArchivedRound] = useState<HistoryRound | null>(null);
   const [participants, setParticipants] = useState<ParticipantDetail[]>([]);
@@ -397,9 +397,12 @@ export default function RoundDetail() {
                       <Trophy className="w-4 h-4 text-amber-500" />
                       <span className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Winner</span>
                     </div>
-                    <div className="text-sm font-mono font-medium text-slate-900 dark:text-white break-all">
+                    <button
+                      onClick={() => navigateToPlayer(winnerStr)}
+                      className="text-sm font-mono font-medium text-slate-900 dark:text-white break-all hover:underline cursor-pointer text-left"
+                    >
                       {winnerStr}
-                    </div>
+                    </button>
                   </div>
                 )}
 
@@ -474,9 +477,10 @@ export default function RoundDetail() {
                 </h2>
                 <div className="space-y-1.5 max-h-[400px] overflow-y-auto pr-1">
                   {participants.map((p) => (
-                    <div
+                    <button
                       key={p.address}
-                      className={`flex items-center gap-3 p-2.5 rounded-xl border transition-colors ${p.isWinner
+                      onClick={() => navigateToPlayer(p.address)}
+                      className={`flex items-center gap-3 p-2.5 rounded-xl border transition-colors w-full text-left cursor-pointer hover:ring-1 hover:ring-primary/30 ${p.isWinner
                         ? 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20'
                         : 'border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50'
                         }`}
@@ -510,7 +514,7 @@ export default function RoundDetail() {
                           style={{ width: `${Math.min(p.pct, 100)}%`, backgroundColor: p.color }}
                         />
                       </div>
-                    </div>
+                    </button>
                   ))}
                   {participants.length === 0 && (
                     <div className="text-center text-slate-400 py-8 text-sm">No participants</div>

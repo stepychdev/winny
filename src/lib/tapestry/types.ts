@@ -75,6 +75,10 @@ export interface Roll2RollSocialActivity {
   activity: string;
   /** Present only for `new_content` items that carry game-event data. */
   gameEvent?: GameEventProperties;
+  /** Wallet address of the actor (resolved from profile). */
+  actorWallet?: string;
+  /** Wallet address of the target (resolved from profile). */
+  targetWallet?: string;
 }
 
 export type TapestryProfilesResponse = {

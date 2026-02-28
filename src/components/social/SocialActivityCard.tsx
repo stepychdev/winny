@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Activity, MessageSquare, Heart, UserPlus2, UserRoundPlus, Zap, ArrowDownToLine, Trophy, Gift, Gamepad2, TrendingDown } from "lucide-react";
 import { useTapestryActivityFeed } from "../../hooks/useTapestryActivityFeed";
+import { useNavigation } from "../../contexts/NavigationContext";
 import type { Roll2RollSocialActivity, GameEventProperties } from "../../lib/tapestry/types";
 
 interface SocialActivityCardProps {
@@ -131,6 +132,7 @@ function compactUsername(username?: string | null) {
 
 export function SocialActivityCard({ walletAddress }: SocialActivityCardProps) {
   const { activities, loading } = useTapestryActivityFeed(walletAddress, 10);
+  const { navigateToPlayer } = useNavigation();
   const [expanded, setExpanded] = useState(false);
   const visibleActivities = expanded ? activities : activities.slice(0, 5);
 
@@ -215,9 +217,18 @@ export function SocialActivityCard({ walletAddress }: SocialActivityCardProps) {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="text-[12px] font-semibold text-slate-900 dark:text-white truncate">
-                            @{compactUsername(item.actorUsername)}
-                          </span>
+                          {item.actorWallet ? (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); navigateToPlayer(item.actorWallet!); }}
+                              className="text-[12px] font-semibold text-slate-900 dark:text-white truncate hover:underline cursor-pointer"
+                            >
+                              @{compactUsername(item.actorUsername)}
+                            </button>
+                          ) : (
+                            <span className="text-[12px] font-semibold text-slate-900 dark:text-white truncate">
+                              @{compactUsername(item.actorUsername)}
+                            </span>
+                          )}
                           <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${config.iconColor} bg-slate-50 dark:bg-slate-700/60 leading-none`}>
                             {config.label}
                           </span>
@@ -231,7 +242,17 @@ export function SocialActivityCard({ walletAddress }: SocialActivityCardProps) {
                       </p>
                       {item.targetUsername && (
                         <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
-                          → @{compactUsername(item.targetUsername)}
+                          →{' '}
+                          {item.targetWallet ? (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); navigateToPlayer(item.targetWallet!); }}
+                              className="hover:underline cursor-pointer"
+                            >
+                              @{compactUsername(item.targetUsername)}
+                            </button>
+                          ) : (
+                            <>@{compactUsername(item.targetUsername)}</>
+                          )}
                         </div>
                       )}
                     </div>

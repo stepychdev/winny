@@ -337,6 +337,13 @@ export async function getActivityFeed(
     // Enrich new_content activities with game-event properties (batch fetch).
     activities = await enrichContentActivities(client, apiKey, activities);
 
+    // Enrich all activities with actor/target wallet addresses (best-effort).
+    try {
+      activities = await enrichActivitiesWithWallets(client, apiKey, activities);
+    } catch {
+      // Non-critical — activities are still usable without wallet addresses
+    }
+
     const payload = {
       activities,
       page: Number(data.page || page) || page,
@@ -598,4 +605,71 @@ async function enrichContentActivities(
     if (!props) return a;
     return { ...a, gameEvent: props as GameEventProperties };
   });
+}
+
+// ---------------------------------------------------------------------------
+// Wallet resolution — batch-resolve profile IDs to wallet addresses so the
+// client can navigate to player profiles from the social activity feed.
+// ---------------------------------------------------------------------------
+
+const WALLET_BY_PROFILE_CACHE = new Map<string, { ts: number; wallet: string | null }>();
+const WALLET_BY_PROFILE_CACHE_TTL_MS = 120_000;
+
+async function enrichActivitiesWithWallets(
+  client: SocialFi<unknown>,
+  apiKey: string,
+  activities: Roll2RollSocialActivity[],
+): Promise<Roll2RollSocialActivity[]> {
+  // Collect unique profile IDs that need wallet resolution
+  const profileIds = new Set<string>();
+  for (const a of activities) {
+    if (a.actorProfileId) profileIds.add(a.actorProfileId);
+    if (a.targetProfileId && (a.type === "following" || a.type === "new_follower")) {
+      profileIds.add(a.targetProfileId);
+    }
+  }
+
+  if (profileIds.size === 0) return activities;
+
+  // Resolve each profile ID → wallet (with cache)
+  const walletMap: Record<string, string | null> = {};
+  const toResolve: string[] = [];
+
+  for (const pid of profileIds) {
+    const cached = WALLET_BY_PROFILE_CACHE.get(pid);
+    if (cached && Date.now() - cached.ts < WALLET_BY_PROFILE_CACHE_TTL_MS) {
+      walletMap[pid] = cached.wallet;
+    } else {
+      toResolve.push(pid);
+    }
+  }
+
+  await Promise.all(
+    toResolve.map(async (pid) => {
+      try {
+        const detail = await client.profiles.profilesDetail({ id: pid, apiKey });
+        const wallet = (detail as any)?.walletAddress || (detail as any)?.wallet?.address || null;
+        walletMap[pid] = wallet;
+        WALLET_BY_PROFILE_CACHE.set(pid, { ts: Date.now(), wallet });
+      } catch {
+        walletMap[pid] = null;
+        WALLET_BY_PROFILE_CACHE.set(pid, { ts: Date.now(), wallet: null });
+      }
+    }),
+  );
+
+  // Evict old entries
+  if (WALLET_BY_PROFILE_CACHE.size > PROFILE_CACHE_MAX_ENTRIES) {
+    const overflow = WALLET_BY_PROFILE_CACHE.size - PROFILE_CACHE_MAX_ENTRIES;
+    const oldest = [...WALLET_BY_PROFILE_CACHE.entries()]
+      .sort((a, b) => a[1].ts - b[1].ts)
+      .slice(0, overflow);
+    for (const [key] of oldest) WALLET_BY_PROFILE_CACHE.delete(key);
+  }
+
+  return activities.map((a) => ({
+    ...a,
+    actorWallet: walletMap[a.actorProfileId] ?? undefined,
+    targetWallet: a.targetProfileId ? walletMap[a.targetProfileId] ?? undefined : undefined,
+  }));
 }
