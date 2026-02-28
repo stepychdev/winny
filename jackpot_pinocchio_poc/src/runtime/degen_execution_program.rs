@@ -94,6 +94,9 @@ fn process_begin_degen_execution(
             )
         }
         [executor, config, degen_config, round, degen_claim, vault, executor_usdc_ata, treasury_usdc_ata, vrf_payer_authority, vrf_payer_usdc_ata, selected_token_mint, receiver_token_ata, token_program] => {
+            // Anchor sends program_id as sentinel for Option<Account> = None
+            let vrf_auth = if vrf_payer_authority.address() == program_id { None } else { Some(vrf_payer_authority) };
+            let vrf_ata = if vrf_payer_usdc_ata.address() == program_id { None } else { Some(vrf_payer_usdc_ata) };
             (
                 executor,
                 config,
@@ -103,8 +106,8 @@ fn process_begin_degen_execution(
                 vault,
                 executor_usdc_ata,
                 treasury_usdc_ata,
-                Some(vrf_payer_authority),
-                Some(vrf_payer_usdc_ata),
+                vrf_auth,
+                vrf_ata,
                 selected_token_mint,
                 receiver_token_ata,
                 token_program,
@@ -216,8 +219,11 @@ fn process_claim_degen_fallback(
             [winner, config, round, degen_claim, vault, winner_usdc_ata, treasury_usdc_ata, token_program] => {
                 (winner, config, round, degen_claim, vault, winner_usdc_ata, treasury_usdc_ata, None, None, token_program)
             }
-            [winner, config, round, degen_claim, vault, winner_usdc_ata, treasury_usdc_ata, vrf_payer_authority, vrf_payer_usdc_ata, token_program] => {
-                (winner, config, round, degen_claim, vault, winner_usdc_ata, treasury_usdc_ata, Some(vrf_payer_authority), Some(vrf_payer_usdc_ata), token_program)
+            [winner, config, round, degen_claim, vault, winner_usdc_ata, treasury_usdc_ata, maybe_vrf_auth, maybe_vrf_ata, token_program] => {
+                // Anchor sends program_id as sentinel for Option<Account> = None
+                let vrf_auth = if maybe_vrf_auth.address() == program_id { None } else { Some(maybe_vrf_auth) };
+                let vrf_ata = if maybe_vrf_ata.address() == program_id { None } else { Some(maybe_vrf_ata) };
+                (winner, config, round, degen_claim, vault, winner_usdc_ata, treasury_usdc_ata, vrf_auth, vrf_ata, token_program)
             }
             _ => return Err(ProgramError::NotEnoughAccountKeys),
         };
@@ -318,8 +324,11 @@ fn process_claim_degen(
             [winner, config, round, degen_claim, vault, winner_usdc_ata, treasury_usdc_ata, token_program] => {
                 (winner, config, round, degen_claim, vault, winner_usdc_ata, treasury_usdc_ata, None, None, token_program)
             }
-            [winner, config, round, degen_claim, vault, winner_usdc_ata, treasury_usdc_ata, vrf_payer_authority, vrf_payer_usdc_ata, token_program] => {
-                (winner, config, round, degen_claim, vault, winner_usdc_ata, treasury_usdc_ata, Some(vrf_payer_authority), Some(vrf_payer_usdc_ata), token_program)
+            [winner, config, round, degen_claim, vault, winner_usdc_ata, treasury_usdc_ata, maybe_vrf_auth, maybe_vrf_ata, token_program] => {
+                // Anchor sends program_id as sentinel for Option<Account> = None
+                let vrf_auth = if maybe_vrf_auth.address() == program_id { None } else { Some(maybe_vrf_auth) };
+                let vrf_ata = if maybe_vrf_ata.address() == program_id { None } else { Some(maybe_vrf_ata) };
+                (winner, config, round, degen_claim, vault, winner_usdc_ata, treasury_usdc_ata, vrf_auth, vrf_ata, token_program)
             }
             _ => return Err(ProgramError::NotEnoughAccountKeys),
         };

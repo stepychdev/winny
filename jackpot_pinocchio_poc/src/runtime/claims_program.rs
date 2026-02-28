@@ -52,8 +52,10 @@ fn process_claim(
             [winner, config, round, vault, winner_usdc_ata, treasury_usdc_ata, token_program] => {
                 (winner, config, round, vault, winner_usdc_ata, treasury_usdc_ata, None, token_program)
             }
-            [winner, config, round, vault, winner_usdc_ata, treasury_usdc_ata, vrf_payer_usdc_ata, token_program] => {
-                (winner, config, round, vault, winner_usdc_ata, treasury_usdc_ata, Some(vrf_payer_usdc_ata), token_program)
+            [winner, config, round, vault, winner_usdc_ata, treasury_usdc_ata, maybe_vrf, token_program] => {
+                // Anchor sends program_id as sentinel for Option<Account> = None
+                let vrf = if maybe_vrf.address() == program_id { None } else { Some(maybe_vrf) };
+                (winner, config, round, vault, winner_usdc_ata, treasury_usdc_ata, vrf, token_program)
             }
             _ => return Err(ProgramError::NotEnoughAccountKeys),
         };
@@ -133,8 +135,10 @@ fn process_auto_claim(
             [payer, config, round, vault, winner_usdc_ata, treasury_usdc_ata, token_program] => {
                 (payer, config, round, vault, winner_usdc_ata, treasury_usdc_ata, None, token_program)
             }
-            [payer, config, round, vault, winner_usdc_ata, treasury_usdc_ata, vrf_payer_usdc_ata, token_program] => {
-                (payer, config, round, vault, winner_usdc_ata, treasury_usdc_ata, Some(vrf_payer_usdc_ata), token_program)
+            [payer, config, round, vault, winner_usdc_ata, treasury_usdc_ata, maybe_vrf, token_program] => {
+                // Anchor sends program_id as sentinel for Option<Account> = None
+                let vrf = if maybe_vrf.address() == program_id { None } else { Some(maybe_vrf) };
+                (payer, config, round, vault, winner_usdc_ata, treasury_usdc_ata, vrf, token_program)
             }
             _ => return Err(ProgramError::NotEnoughAccountKeys),
         };
