@@ -283,7 +283,8 @@ export function useJackpot(): JackpotState {
     map: Map<string, { symbol: string; icon: string }[]>;
     processedSigs: Set<string>;
     resolving: boolean;
-  }>({ roundId: 0, map: new Map(), processedSigs: new Set(), resolving: false });
+    lastResolveTs: number;
+  }>({ roundId: 0, map: new Map(), processedSigs: new Set(), resolving: false, lastResolveTs: 0 });
 
   // ─── Find latest active round on startup ───────────
   useEffect(() => {
@@ -346,30 +347,43 @@ export function useJackpot(): JackpotState {
   }, [connection, initialized]);
 
   // ─── Resolve deposit tokens from round PDA tx signatures ──
+  const RESOLVE_COOLDOWN_MS = 30_000; // Don't re-resolve more than once per 30s
   const resolveDepositTokens = useCallback(async (
     roundPda: PublicKey,
     participantAddresses: string[],
   ) => {
     const cache = depositTokensCacheRef.current;
     if (cache.resolving) return;
+    // Cooldown: avoid hammering RPC with repeated resolve calls
+    if (Date.now() - cache.lastResolveTs < RESOLVE_COOLDOWN_MS) return;
     // Only resolve for unresolved participants
     const unresolved = participantAddresses.filter(a => !cache.map.has(a));
     if (unresolved.length === 0) return;
 
     cache.resolving = true;
+    cache.lastResolveTs = Date.now();
     try {
-      const sigs = await connection.getSignaturesForAddress(roundPda, { limit: 50 });
+      const sigs = await connection.getSignaturesForAddress(roundPda, { limit: 30 });
       const newSigs = sigs.filter(s => !cache.processedSigs.has(s.signature) && !s.err);
       if (newSigs.length === 0) { cache.resolving = false; return; }
 
       const mintsByUser = new Map<string, Set<string>>();
       const USDC_MINT_STR = USDC_MINT.toBase58();
 
-      for (const sigInfo of newSigs) {
-        try {
-          const tx = await connection.getParsedTransaction(sigInfo.signature, {
+      // Fetch parsed transactions with concurrency limit to avoid rate-limiting
+      const CONCURRENCY = 3;
+      for (let i = 0; i < newSigs.length; i += CONCURRENCY) {
+        const batch = newSigs.slice(i, i + CONCURRENCY);
+        const txResults = await Promise.allSettled(
+          batch.map(s => connection.getParsedTransaction(s.signature, {
             maxSupportedTransactionVersion: 0,
-          });
+          }))
+        );
+        for (let j = 0; j < batch.length; j++) {
+          const sigInfo = batch[j];
+          const result = txResults[j];
+          if (result.status === 'rejected') { cache.processedSigs.add(sigInfo.signature); continue; }
+          const tx = result.value;
           if (!tx?.meta) { cache.processedSigs.add(sigInfo.signature); continue; }
 
           // Signer = depositor (v0 txs have source: 'transaction'|'lookupTable')
@@ -400,8 +414,8 @@ export function useJackpot(): JackpotState {
               mintsByUser.get(signer)!.add(mint);
             }
           }
-        } catch { /* skip failed tx fetch */ }
-        cache.processedSigs.add(sigInfo.signature);
+          cache.processedSigs.add(sigInfo.signature);
+        }
       }
 
       // Resolve metadata for discovered mints
@@ -462,11 +476,11 @@ export function useJackpot(): JackpotState {
     // Reset deposit tokens cache when round changes
     if (depositTokensCacheRef.current.roundId !== roundId) {
       depositTokensCacheRef.current = {
-        roundId, map: new Map(), processedSigs: new Set(), resolving: false,
+        roundId, map: new Map(), processedSigs: new Set(), resolving: false, lastResolveTs: 0,
       };
     }
 
-    // Fetch USDC icon once (not per-participant)
+    // Fetch USDC icon once (cached in tokenMetadata module — no RPC after first call)
     let usdcIcon = "";
     try {
       const usdcMeta = await fetchTokenMetadata(connection, USDC_MINT);

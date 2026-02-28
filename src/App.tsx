@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
-import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
+// Phantom & Solflare register as Standard Wallets automatically —
+// explicit adapters are no longer needed.
 import { clusterApiUrl } from '@solana/web3.js';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
@@ -38,10 +39,12 @@ const RPC_ENDPOINT =
 const WS_ENDPOINT = (() => {
   const rpcProxy = (import.meta.env.VITE_RPC_PROXY_URL as string | undefined)?.trim();
   const rpcFallback = (import.meta.env.VITE_RPC_URL as string | undefined)?.trim();
-  const base =
-    rpcProxy ||
-    rpcFallback ||
-    clusterApiUrl(SOLANA_NETWORK === 'mainnet' ? 'mainnet-beta' : 'devnet');
+  const publicWs = clusterApiUrl(SOLANA_NETWORK === 'mainnet' ? 'mainnet-beta' : 'devnet');
+
+  // Pick the best WS-capable base URL.
+  // Never derive WS from a Vercel /api/* route — it's HTTP-only.
+  const candidates = [rpcProxy, rpcFallback].filter(Boolean) as string[];
+  const base = candidates.find(u => !u.includes('/api/solana-rpc')) || publicWs;
   return deriveWsEndpoint(base);
 })();
 
@@ -59,11 +62,8 @@ function PageRouter() {
 }
 
 function App() {
-  const wallets = useMemo(() => [
-    new PhantomWalletAdapter(),
-    new SolflareWalletAdapter(),
-  ], []);
-  const connectionConfig = useMemo(() => ({ wsEndpoint: WS_ENDPOINT }), []);
+  const wallets = useMemo(() => [], []);
+  const connectionConfig = useMemo(() => ({ commitment: 'confirmed' as const, wsEndpoint: WS_ENDPOINT }), []);
 
   return (
     <ConnectionProvider endpoint={RPC_ENDPOINT} config={connectionConfig}>
