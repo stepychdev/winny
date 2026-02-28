@@ -39,6 +39,7 @@ pub fn instruction_discriminator(name: &str) -> [u8; ANCHOR_DISCRIMINATOR_LEN] {
         "degen_vrf_callback"     => precomputed::IX_DEGEN_VRF_CALLBACK,
         "begin_degen_execution"  => precomputed::IX_BEGIN_DEGEN_EXECUTION,
         "claim_degen_fallback"   => precomputed::IX_CLAIM_DEGEN_FALLBACK,
+        "auto_claim_degen_fallback" => precomputed::IX_AUTO_CLAIM_DEGEN_FALLBACK,
         "claim_degen"            => precomputed::IX_CLAIM_DEGEN,
         "finalize_degen_success" => precomputed::IX_FINALIZE_DEGEN_SUCCESS,
         #[cfg(test)]
@@ -93,6 +94,7 @@ mod tests {
             "request_vrf", "vrf_callback",
             "request_degen_vrf", "degen_vrf_callback",
             "begin_degen_execution", "claim_degen_fallback",
+            "auto_claim_degen_fallback",
             "claim_degen", "finalize_degen_success",
         ];
         for name in names {

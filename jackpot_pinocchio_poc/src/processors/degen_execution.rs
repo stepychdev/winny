@@ -67,10 +67,20 @@ impl<'a> DegenExecutionProcessor<'a> {
             ));
         }
 
-        if discriminator == instruction_discriminator("claim_degen_fallback") {
+        if discriminator == instruction_discriminator("claim_degen_fallback")
+            || discriminator == instruction_discriminator("auto_claim_degen_fallback")
+        {
+            // For auto_claim_degen_fallback the winner_pubkey comes from the round
+            // account data (set by the runtime layer) — not from a signer.
+            let winner_pubkey = self.winner_pubkey.ok_or(ProgramError::InvalidInstructionData)?;
+            let ix_name = if discriminator == instruction_discriminator("auto_claim_degen_fallback") {
+                "auto_claim_degen_fallback"
+            } else {
+                "claim_degen_fallback"
+            };
             return Ok(DegenExecutionEffect::Fallback(
-                handlers::claim_degen_fallback::process_anchor_bytes(
-                    self.winner_pubkey.ok_or(ProgramError::InvalidInstructionData)?,
+                handlers::claim_degen_fallback::process_anchor_bytes_named(
+                    winner_pubkey,
                     self.round_pubkey,
                     self.vault_pubkey.ok_or(ProgramError::InvalidInstructionData)?,
                     self.now_ts,
@@ -84,6 +94,7 @@ impl<'a> DegenExecutionProcessor<'a> {
                     self.vrf_payer_authority_pubkey,
                     self.vrf_payer_usdc_ata_data,
                     ix_data,
+                    ix_name,
                 )?,
             ));
         }

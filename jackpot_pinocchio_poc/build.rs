@@ -102,6 +102,7 @@ fn generate_discriminators(out_dir: &PathBuf) {
         "degen_vrf_callback",
         "begin_degen_execution",
         "claim_degen_fallback",
+        "auto_claim_degen_fallback",
         "claim_degen",
         "finalize_degen_success",
     ];

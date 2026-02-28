@@ -46,6 +46,9 @@ pub fn process_instruction(
     if discriminator == instruction_discriminator("claim_degen_fallback") {
         return process_claim_degen_fallback(program_id, accounts, instruction_data);
     }
+    if discriminator == instruction_discriminator("auto_claim_degen_fallback") {
+        return process_auto_claim_degen_fallback(program_id, accounts, instruction_data);
+    }
     if discriminator == instruction_discriminator("claim_degen") {
         return process_claim_degen(program_id, accounts, instruction_data);
     }
@@ -265,6 +268,118 @@ fn process_claim_degen_fallback(
         let mut processor = DegenExecutionProcessor {
             executor_pubkey: None,
             winner_pubkey: Some(winner.address().to_bytes()),
+            round_pubkey: round.address().to_bytes(),
+            vault_pubkey: Some(vault.address().to_bytes()),
+            treasury_usdc_ata_pubkey: Some(treasury_usdc_ata.address().to_bytes()),
+            selected_token_mint_pubkey: None,
+            receiver_token_ata_pubkey: None,
+            vrf_payer_authority_pubkey: vrf_payer_authority.map(|a| a.address().to_bytes()),
+            now_ts: clock_unix_timestamp(),
+            config_account_data: Some(&config_data),
+            degen_config_account_data: None,
+            round_account_data: &mut round_shadow,
+            degen_claim_account_data: &mut degen_claim_shadow,
+            vault_account_data: Some(&vault_data),
+            executor_usdc_ata_data: None,
+            winner_usdc_ata_data: Some(&winner_usdc_ata_data),
+            treasury_usdc_ata_data: Some(&treasury_usdc_ata_data),
+            receiver_token_ata_data: None,
+            vrf_payer_usdc_ata_data: vrf_payer_usdc_ata_data.as_deref(),
+        };
+        let amounts = match processor.process(instruction_data)? {
+            DegenExecutionEffect::Fallback(amounts) => amounts,
+            _ => return Err(ProgramError::InvalidInstructionData),
+        };
+        (amounts, round_shadow, degen_claim_shadow)
+    };
+
+    transfer_fallback_amounts(
+        vault,
+        winner_usdc_ata,
+        treasury_usdc_ata,
+        vrf_payer_usdc_ata,
+        round,
+        amounts.vrf_reimburse,
+        amounts.payout,
+        amounts.fee,
+    )?;
+
+    {
+        let mut round_data = round.try_borrow_mut()?;
+        round_data.copy_from_slice(&round_shadow);
+    }
+    {
+        let mut degen_claim_data = degen_claim.try_borrow_mut()?;
+        degen_claim_data.copy_from_slice(&degen_claim_shadow);
+    }
+    Ok(())
+}
+
+/// auto_claim_degen_fallback — anyone (crank/payer) can trigger degen fallback on behalf of winner.
+/// Identical to claim_degen_fallback but winner is NOT required to sign.
+/// Accounts: [payer(signer), config, round, degen_claim, vault, winner_usdc_ata, treasury, vrf_auth?, vrf_ata?, token_program]
+fn process_auto_claim_degen_fallback(
+    program_id: &Address,
+    accounts: &[AccountView],
+    instruction_data: &[u8],
+) -> ProgramResult {
+    let (payer, config, round, degen_claim, vault, winner_usdc_ata, treasury_usdc_ata, vrf_payer_authority, vrf_payer_usdc_ata, token_program) =
+        match accounts {
+            [payer, config, round, degen_claim, vault, winner_usdc_ata, treasury_usdc_ata, token_program] => {
+                (payer, config, round, degen_claim, vault, winner_usdc_ata, treasury_usdc_ata, None, None, token_program)
+            }
+            [payer, config, round, degen_claim, vault, winner_usdc_ata, treasury_usdc_ata, maybe_vrf_auth, maybe_vrf_ata, token_program] => {
+                let vrf_auth = if maybe_vrf_auth.address() == program_id { None } else { Some(maybe_vrf_auth) };
+                let vrf_ata = if maybe_vrf_ata.address() == program_id { None } else { Some(maybe_vrf_ata) };
+                (payer, config, round, degen_claim, vault, winner_usdc_ata, treasury_usdc_ata, vrf_auth, vrf_ata, token_program)
+            }
+            _ => return Err(ProgramError::NotEnoughAccountKeys),
+        };
+
+    require_signer(payer)?;
+    require_writable(round)?;
+    require_writable(degen_claim)?;
+    require_writable(vault)?;
+    require_writable(winner_usdc_ata)?;
+    require_writable(treasury_usdc_ata)?;
+    let _config = require_config_pda(config, program_id)?;
+    let round_id = crate::instruction_layouts::parse_round_id_u8_ix(instruction_data, "auto_claim_degen_fallback")
+        .map_err(|_| ProgramError::InvalidInstructionData)?
+        .0;
+    require_round_pda_for_round_id(round, program_id, round_id)?;
+    require_existing_degen_claim_pda_for_round_id(degen_claim, program_id, round_id)?;
+    require_token_program(token_program)?;
+    require_token_account_owned_by_program(vault, token_program)?;
+    require_token_account_owned_by_program(winner_usdc_ata, token_program)?;
+    require_token_account_owned_by_program(treasury_usdc_ata, token_program)?;
+    if let Some(vrf_payer_usdc_ata) = vrf_payer_usdc_ata {
+        require_writable(vrf_payer_usdc_ata)?;
+        require_token_account_owned_by_program(vrf_payer_usdc_ata, token_program)?;
+    }
+
+    // Read winner from round data (no signature required — anyone can trigger)
+    let winner_pubkey = {
+        let round_data = round.try_borrow()?;
+        crate::legacy_layouts::RoundLifecycleView::read_winner_from_account_data(&round_data)
+            .map_err(|_| ProgramError::InvalidAccountData)?
+    };
+
+    let (amounts, round_shadow, degen_claim_shadow) = {
+        let config_data = config.try_borrow()?;
+        let round_data = round.try_borrow()?;
+        let mut round_shadow = round_data.to_vec();
+        let degen_claim_data = degen_claim.try_borrow()?;
+        let mut degen_claim_shadow = degen_claim_data.to_vec();
+        let vault_data = vault.try_borrow()?;
+        let winner_usdc_ata_data = winner_usdc_ata.try_borrow()?;
+        let treasury_usdc_ata_data = treasury_usdc_ata.try_borrow()?;
+        let vrf_payer_usdc_ata_data = match vrf_payer_usdc_ata {
+            Some(account) => Some(account.try_borrow()?),
+            None => None,
+        };
+        let mut processor = DegenExecutionProcessor {
+            executor_pubkey: None,
+            winner_pubkey: Some(winner_pubkey),
             round_pubkey: round.address().to_bytes(),
             vault_pubkey: Some(vault.address().to_bytes()),
             treasury_usdc_ata_pubkey: Some(treasury_usdc_ata.address().to_bytes()),
@@ -1132,6 +1247,59 @@ mod tests {
         assert_eq!(updated_vault.amount, 0);
         assert_eq!(updated_winner.amount, 998_000, "winner should receive payout(798k) + vrf_reimburse(200k)");
         assert_eq!(updated_treasury.amount, 2_000);
+    }
+
+    /// auto_claim_degen_fallback: payer (non-winner) triggers fallback,
+    /// transfers go to winner ATA, treasury, etc. — same as claim_degen_fallback
+    /// but the first account is an arbitrary payer, not the winner.
+    #[test]
+    fn auto_claim_degen_fallback_runtime_transfers_and_marks_claimed() {
+        let winner = Address::new_from_array([9u8; 32]);
+        let payer = Address::new_from_array([42u8; 32]); // different from winner
+        let (config_pda, config_data) = sample_config();
+        let (round_pda, round_data) = sample_round(DEGEN_MODE_VRF_READY);
+        let (degen_claim_pda, degen_claim_data) = sample_degen_claim(round_pda, DEGEN_CLAIM_STATUS_VRF_READY, [0u8; 32], [0u8; 32]);
+        let vault_data = token_account([2u8; 32], round_pda.to_bytes(), 1_000_000);
+        let winner_usdc_ata_data = token_account([2u8; 32], winner.to_bytes(), 0);
+        let treasury_data = token_account([2u8; 32], [7u8; 32], 0);
+
+        let mut payer_account = TestAccount::new(payer.to_bytes(), SYSTEM_PROGRAM_ID, true, false, 1_000_000, &[]);
+        let mut config_account = TestAccount::new(config_pda.to_bytes(), PROGRAM_ID, false, false, 1_000_000, &config_data);
+        let mut round_account = TestAccount::new(round_pda.to_bytes(), PROGRAM_ID, false, true, 1_000_000, &round_data);
+        let mut degen_claim_account = TestAccount::new(degen_claim_pda.to_bytes(), PROGRAM_ID, false, true, 1_000_000, &degen_claim_data);
+        let mut vault_account = TestAccount::new(round_pda.to_bytes(), pinocchio_token::ID, false, true, 1_000_000, &vault_data);
+        let mut winner_usdc_ata_account = TestAccount::new([13u8; 32], pinocchio_token::ID, false, true, 1_000_000, &winner_usdc_ata_data);
+        let mut treasury_account = TestAccount::new([3u8; 32], pinocchio_token::ID, false, true, 1_000_000, &treasury_data);
+        let mut token_program = TestAccount::new(pinocchio_token::ID.to_bytes(), pinocchio_token::ID, false, false, 1_000_000, &[]);
+
+        let mut ix = Vec::new();
+        ix.extend_from_slice(&instruction_discriminator("auto_claim_degen_fallback"));
+        ix.extend_from_slice(&81u64.to_le_bytes());
+        ix.push(3); // fallback_reason
+
+        let accounts = [
+            payer_account.view(),
+            config_account.view(),
+            round_account.view(),
+            degen_claim_account.view(),
+            vault_account.view(),
+            winner_usdc_ata_account.view(),
+            treasury_account.view(),
+            token_program.view(),
+        ];
+
+        process_instruction(&PROGRAM_ID, &accounts, &ix).unwrap();
+
+        let updated_vault = TokenAccountWithAmountView::read_from_account_data(vault_account.data()).unwrap();
+        let updated_winner = TokenAccountWithAmountView::read_from_account_data(winner_usdc_ata_account.data()).unwrap();
+        let updated_treasury = TokenAccountWithAmountView::read_from_account_data(treasury_account.data()).unwrap();
+        assert_eq!(updated_vault.amount, 0);
+        assert_eq!(updated_winner.amount, 997_500);
+        assert_eq!(updated_treasury.amount, 2_500);
+        let updated_round = RoundLifecycleView::read_from_account_data(round_account.data()).unwrap();
+        assert_eq!(updated_round.status, ROUND_STATUS_CLAIMED);
+        let updated_claim = DegenClaimView::read_from_account_data(degen_claim_account.data()).unwrap();
+        assert_eq!(updated_claim.status, DEGEN_CLAIM_STATUS_CLAIMED_FALLBACK);
     }
 
     #[test]

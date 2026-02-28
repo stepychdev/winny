@@ -187,6 +187,42 @@ export async function buildAutoClaim(
     .instruction();
 }
 
+export async function buildAutoClaimDegenFallback(
+  program: Program,
+  payer: PublicKey,
+  winner: PublicKey,
+  roundId: number,
+  fallbackReason: number,
+  vrfPayer?: PublicKey
+): Promise<TransactionInstruction> {
+  const roundPda = getRoundPda(roundId);
+  const vaultAta = await getAssociatedTokenAddress(USDC_MINT, roundPda, true);
+  const winnerAta = await getAssociatedTokenAddress(USDC_MINT, winner);
+
+  let vrfPayerAuthority: PublicKey | null = null;
+  let vrfPayerUsdcAta: PublicKey | null = null;
+  if (vrfPayer && !vrfPayer.equals(PublicKey.default)) {
+    vrfPayerAuthority = vrfPayer;
+    vrfPayerUsdcAta = await getAssociatedTokenAddress(USDC_MINT, vrfPayer);
+  }
+
+  return await (program.methods as any)
+    .autoClaimDegenFallback(new BN(roundId), fallbackReason)
+    .accounts({
+      payer,
+      config: getConfigPda(),
+      round: roundPda,
+      degenClaim: getDegenClaimPda(roundId, winner),
+      vaultUsdcAta: vaultAta,
+      winnerUsdcAta: winnerAta,
+      treasuryUsdcAta: TREASURY_USDC_ATA,
+      vrfPayerAuthority: vrfPayerAuthority as any,
+      vrfPayerUsdcAta: vrfPayerUsdcAta as any,
+      tokenProgram: TOKEN_PROGRAM_ID,
+    })
+    .instruction();
+}
+
 export async function buildClaimRefund(
   program: Program,
   user: PublicKey,

@@ -30,8 +30,37 @@ pub fn process_anchor_bytes(
     vrf_payer_usdc_ata_data: Option<&[u8]>,
     ix_data: &[u8],
 ) -> Result<ClaimAmountsCompat, ProgramError> {
+    process_anchor_bytes_named(
+        winner_pubkey, round_pubkey, vault_pubkey, now_ts,
+        config_account_data, round_account_data, degen_claim_account_data,
+        vault_account_data, winner_usdc_ata_data, treasury_usdc_ata_pubkey,
+        treasury_usdc_ata_data, vrf_payer_authority_pubkey, vrf_payer_usdc_ata_data,
+        ix_data, "claim_degen_fallback",
+    )
+}
+
+/// Same as `process_anchor_bytes` but accepts an explicit instruction name
+/// so `auto_claim_degen_fallback` can reuse the logic with its own discriminator.
+#[allow(clippy::too_many_arguments)]
+pub fn process_anchor_bytes_named(
+    winner_pubkey: [u8; PUBKEY_LEN],
+    round_pubkey: [u8; PUBKEY_LEN],
+    vault_pubkey: [u8; PUBKEY_LEN],
+    now_ts: i64,
+    config_account_data: &[u8],
+    round_account_data: &mut [u8],
+    degen_claim_account_data: &mut [u8],
+    vault_account_data: &[u8],
+    winner_usdc_ata_data: &[u8],
+    treasury_usdc_ata_pubkey: [u8; PUBKEY_LEN],
+    treasury_usdc_ata_data: &[u8],
+    vrf_payer_authority_pubkey: Option<[u8; PUBKEY_LEN]>,
+    vrf_payer_usdc_ata_data: Option<&[u8]>,
+    ix_data: &[u8],
+    ix_name: &str,
+) -> Result<ClaimAmountsCompat, ProgramError> {
     let (round_id, fallback_reason) =
-        parse_round_id_u8_ix(ix_data, "claim_degen_fallback")
+        parse_round_id_u8_ix(ix_data, ix_name)
             .map_err(|_| ProgramError::InvalidInstructionData)?;
     let config = ConfigView::read_from_account_data(config_account_data)
         .map_err(|_| ProgramError::InvalidAccountData)?;

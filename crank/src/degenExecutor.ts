@@ -24,6 +24,7 @@ import {
 } from "./constants.js";
 import {
   buildBeginDegenExecution,
+  buildAutoClaimDegenFallback,
   buildFinalizeDegenSuccess,
   createProgram,
 } from "./instructions.js";
@@ -432,7 +433,61 @@ async function processReadyClaim(connection: Connection, executor: Keypair, clai
   }
 
   const fallbackAt = Number(claim.account.fallbackAfterTs.toString());
-  console.warn(`[degen-executor] no viable route for round #${claim.account.roundId.toString()} before fallback_at=${fallbackAt}`);
+  const nowSec = Math.floor(Date.now() / 1000);
+
+  if (nowSec >= fallbackAt) {
+    console.log(`[degen-executor] all candidates failed & fallback window reached for round #${claim.account.roundId.toString()}, triggering auto_claim_degen_fallback`);
+    try {
+      const fallbackReason = 3; // NO_ROUTES_FOUND / all candidates exhausted
+      const winner = claim.account.winner;
+      const vrfPayer = round.vrfPayer.equals(PublicKey.default) ? undefined : round.vrfPayer;
+
+      const winnerAta = await getAssociatedTokenAddress(USDC_MINT, winner);
+      const createWinnerAtaIx = createAssociatedTokenAccountIdempotentInstruction(
+        executor.publicKey,
+        winnerAta,
+        winner,
+        USDC_MINT,
+      );
+
+      const prefixIxs: TransactionInstruction[] = [createWinnerAtaIx];
+      if (vrfPayer) {
+        const vrfAta = await getAssociatedTokenAddress(USDC_MINT, vrfPayer);
+        prefixIxs.push(
+          createAssociatedTokenAccountIdempotentInstruction(
+            executor.publicKey,
+            vrfAta,
+            vrfPayer,
+            USDC_MINT,
+          )
+        );
+      }
+
+      const fallbackIx = await buildAutoClaimDegenFallback(
+        program,
+        executor.publicKey,
+        winner,
+        claim.account.roundId.toNumber(),
+        fallbackReason,
+        vrfPayer,
+      );
+
+      const { blockhash } = await connection.getLatestBlockhash("confirmed");
+      const msg = new TransactionMessage({
+        payerKey: executor.publicKey,
+        recentBlockhash: blockhash,
+        instructions: [...prefixIxs, fallbackIx],
+      }).compileToV0Message();
+      const tx = new VersionedTransaction(msg);
+      const sig = await simulateAndSend(connection, tx, executor);
+      console.log(`[degen-executor] round #${claim.account.roundId.toString()} auto_claim_degen_fallback sig=${sig}`);
+      return;
+    } catch (error) {
+      console.error(`[degen-executor] auto_claim_degen_fallback failed for round #${claim.account.roundId.toString()}:`, error instanceof Error ? error.message : error);
+    }
+  } else {
+    console.warn(`[degen-executor] no viable route for round #${claim.account.roundId.toString()}, fallback_at=${fallbackAt} (in ${fallbackAt - nowSec}s)`);
+  }
 }
 
 async function fetchReadyClaims(program: any): Promise<DegenClaimAccount[]> {

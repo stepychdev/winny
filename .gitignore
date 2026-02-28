@@ -117,3 +117,4 @@ squads_mainnet_out.json
 # local secrets
 .env.devnet
 jackpot_pinocchio_poc/devnet-keys/
+crank/degen-executor-keypair.json

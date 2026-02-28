@@ -658,6 +658,135 @@
       ]
     },
     {
+      "name": "auto_claim_degen_fallback",
+      "docs": [
+        "Anyone can trigger degen fallback claim — funds go to the on-chain winner."
+      ],
+      "discriminator": [
+        124,
+        50,
+        165,
+        11,
+        90,
+        249,
+        189,
+        166
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  102,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "degen_claim",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  103,
+                  101,
+                  110,
+                  95,
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              },
+              {
+                "kind": "account",
+                "path": "degen_claim.winner",
+                "account": "DegenClaim"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_usdc_ata",
+          "writable": true
+        },
+        {
+          "name": "winner_usdc_ata",
+          "writable": true
+        },
+        {
+          "name": "treasury_usdc_ata",
+          "writable": true
+        },
+        {
+          "name": "vrf_payer_authority",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "vrf_payer_usdc_ata",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "round_id",
+          "type": "u64"
+        },
+        {
+          "name": "fallback_reason",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "claim_refund",
       "docs": [
         "[H-2 fix] Participant self-refund from a force-cancelled round (escrow pattern)."
