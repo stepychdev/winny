@@ -13,6 +13,7 @@ const NAV_ITEMS: { label: string; page: Page }[] = [
   { label: 'History', page: 'history' },
   { label: 'How It Works', page: 'how-it-works' },
   { label: 'Fairness', page: 'fairness' },
+  { label: 'Leaderboard', page: 'leaderboard' },
 ];
 
 function formatTimeAgo(ts: number): string {

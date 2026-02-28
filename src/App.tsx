@@ -16,6 +16,7 @@ import History from './pages/History';
 import RoundDetail from './pages/RoundDetail';
 import { Cabinet } from './pages/Cabinet';
 import { PlayerProfile } from './pages/PlayerProfile';
+import { Leaderboard } from './pages/Leaderboard';
 
 import '@solana/wallet-adapter-react-ui/styles.css';
 
@@ -57,6 +58,7 @@ function PageRouter() {
     case 'round-detail': return <RoundDetail />;
     case 'cabinet': return <Cabinet />;
     case 'player-profile': return <PlayerProfile />;
+    case 'leaderboard': return <Leaderboard />;
     default: return <Home />;
   }
 }

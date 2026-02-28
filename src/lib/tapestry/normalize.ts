@@ -13,6 +13,11 @@ export function normalizeTapestryProfile(input: TapestryProfileLike | null | und
     input.namespace?.name?.trim() ||
     wallet;
 
+  const twitterHandle =
+    input.contact?.type === "TWITTER" && input.contact.id
+      ? input.contact.id.replace(/^@/, "")
+      : null;
+
   return {
     wallet,
     profileId: input.profile.id,
@@ -23,6 +28,7 @@ export function normalizeTapestryProfile(input: TapestryProfileLike | null | und
     source: "tapestry",
     namespaceName: input.namespace?.name ?? null,
     namespaceReadableName: input.namespace?.readableName ?? null,
+    twitterHandle,
   };
 }
 

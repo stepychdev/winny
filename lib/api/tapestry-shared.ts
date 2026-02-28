@@ -226,6 +226,13 @@ export async function getProfilesByWallets(wallets: string[]): Promise<Record<st
     })
   );
 
+  // Enrich with Twitter handles from identities API (best-effort, non-blocking)
+  try {
+    await enrichProfilesWithTwitter(result);
+  } catch {
+    // Non-critical — profiles are still usable without Twitter handles
+  }
+
   return result;
 }
 
@@ -464,6 +471,83 @@ export async function searchProfiles(query: string, page?: number, pageSize?: nu
     page: data.page,
     pageSize: data.pageSize,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Identity resolution — resolve Twitter handles via Tapestry Identities API
+// ---------------------------------------------------------------------------
+
+const IDENTITY_CACHE_TTL_MS = 120_000;
+const identityCacheByWallet = new Map<string, { ts: number; twitter: string | null }>();
+
+function getFreshIdentityFromCache(wallet: string): string | null | undefined {
+  const hit = identityCacheByWallet.get(wallet);
+  if (!hit) return undefined;
+  if (Date.now() - hit.ts > IDENTITY_CACHE_TTL_MS) {
+    identityCacheByWallet.delete(wallet);
+    return undefined;
+  }
+  return hit.twitter;
+}
+
+export async function getIdentityForWallet(wallet: string): Promise<{ twitter: string | null; raw?: unknown }> {
+  if (!tapestryKeyPresent()) return { twitter: null };
+
+  const cached = getFreshIdentityFromCache(wallet);
+  if (cached !== undefined) return { twitter: cached };
+
+  const { client, apiKey } = getTapestryClient();
+  try {
+    const data = await client.identities.identitiesDetail({ id: wallet, apiKey });
+    const identities = (data as any)?.identities || [];
+    let twitter: string | null = null;
+
+    for (const identity of identities) {
+      // Look for a contact entry — the contact.id is the handle/identifier
+      const contact = identity?.contact;
+      if (contact?.id) {
+        // If the identity was fetched by wallet, contacts returned are the linked ones.
+        // We detect Twitter by checking if it looks like a handle (not an email, not a phone).
+        const id = String(contact.id).trim();
+        // Tapestry contact types: EMAIL contains @+domain, PHONE is numeric, TWITTER is a handle
+        if (id && !id.includes("@") && !/^\+?\d[\d\s-]+$/.test(id)) {
+          twitter = id.replace(/^@/, "");
+          break;
+        }
+      }
+    }
+
+    identityCacheByWallet.set(wallet, { ts: Date.now(), twitter });
+    evictOldestEntries(identityCacheByWallet, PROFILE_CACHE_MAX_ENTRIES);
+    return { twitter, raw: data };
+  } catch {
+    identityCacheByWallet.set(wallet, { ts: Date.now(), twitter: null });
+    return { twitter: null };
+  }
+}
+
+export async function enrichProfilesWithTwitter(
+  profiles: Record<string, Roll2RollSocialProfile | null>,
+): Promise<Record<string, Roll2RollSocialProfile | null>> {
+  const walletsToResolve = Object.entries(profiles)
+    .filter(([, p]) => p && !p.twitterHandle)
+    .map(([wallet]) => wallet);
+
+  if (walletsToResolve.length === 0) return profiles;
+
+  await Promise.all(
+    walletsToResolve.map(async (wallet) => {
+      const { twitter } = await getIdentityForWallet(wallet);
+      const profile = profiles[wallet];
+      if (profile && twitter) {
+        profiles[wallet] = { ...profile, twitterHandle: twitter };
+        // Update profile cache as well
+        cacheTapestryProfile(wallet, profiles[wallet]!);
+      }
+    }),
+  );
+
+  return profiles;
 }
 
 // ---------------------------------------------------------------------------

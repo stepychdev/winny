@@ -25,7 +25,6 @@ import { shouldShowCancelRefundCard } from '../lib/roundUi';
 import { importOrCreateTapestryProfile, publishTapestryEvent } from '../lib/tapestry/api';
 import { emitFeedRefresh } from '../lib/tapestry/events';
 import { submitVolumeScoreViaApi } from '../lib/soar';
-import { SoarLeaderboard } from '../components/SoarLeaderboard';
 
 const FEE_RATE = 0.0025;
 
@@ -129,7 +128,10 @@ export function Home() {
       missionsApi.trackDeposit(amount, isJupiterSwap);
       if (ENABLE_SOAR_LEADERBOARD && walletAddress) {
         const totalVolumeCents = Math.floor((missionsApi.stats.totalVolume + amount) * 100);
-        submitVolumeScoreViaApi(walletAddress, totalVolumeCents).catch(() => {});
+        console.log('[SOAR] handleDeposit: submitting volume', { walletAddress, totalVolume: missionsApi.stats.totalVolume, amount, totalVolumeCents });
+        submitVolumeScoreViaApi(walletAddress, totalVolumeCents).catch((err) => {
+          console.error('[SOAR] handleDeposit: submit failed', err);
+        });
       }
       refetchTokens(); // refresh wallet token list after deposit
       // Publish deposit event to Tapestry social feed (fire-and-forget)
@@ -154,7 +156,10 @@ export function Home() {
       missionsApi.trackDeposit(totalInputAmount, hasJupiterSwap);
       if (ENABLE_SOAR_LEADERBOARD && walletAddress) {
         const totalVolumeCents = Math.floor((missionsApi.stats.totalVolume + totalInputAmount) * 100);
-        submitVolumeScoreViaApi(walletAddress, totalVolumeCents).catch(() => {});
+        console.log('[SOAR] handleDepositMany: submitting volume', { walletAddress, totalVolume: missionsApi.stats.totalVolume, totalInputAmount, totalVolumeCents });
+        submitVolumeScoreViaApi(walletAddress, totalVolumeCents).catch((err) => {
+          console.error('[SOAR] handleDepositMany: submit failed', err);
+        });
       }
       refetchTokens();
       // Publish deposit event to Tapestry social feed (fire-and-forget)
@@ -356,8 +361,7 @@ export function Home() {
             <Chat />
           </div>
 
-          {/* ── Volume Leaderboard ── */}
-          <SoarLeaderboard compact />
+          {/* Volume Leaderboard moved to dedicated /leaderboard page */}
 
           {connected && ENABLE_TAPESTRY_SOCIAL && (
             <>

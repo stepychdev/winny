@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 
-export type Page = 'game' | 'how-it-works' | 'fairness' | 'history' | 'round-detail' | 'cabinet' | 'player-profile';
+export type Page = 'game' | 'how-it-works' | 'fairness' | 'history' | 'round-detail' | 'cabinet' | 'player-profile' | 'leaderboard';
 
 interface NavigationContextType {
   page: Page;

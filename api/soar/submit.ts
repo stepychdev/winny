@@ -45,20 +45,34 @@ export default async function handler(req: any, res: any) {
     const playerStr = body?.player;
     const totalVolumeCents = body?.totalVolumeCents;
 
+    console.log("[SOAR] Submit request:", { player: playerStr, totalVolumeCents });
+
     if (!playerStr || typeof playerStr !== "string") {
       res.status(400).json({ error: "player is required" });
       return;
     }
     if (typeof totalVolumeCents !== "number" || totalVolumeCents <= 0) {
+      console.error("[SOAR] Invalid totalVolumeCents:", totalVolumeCents);
       res.status(400).json({ error: "totalVolumeCents must be a positive number" });
       return;
     }
+
+    console.log("[SOAR] Env check:", {
+      hasRpcUrl: !!RPC_URL,
+      hasGamePk: !!SOAR_GAME_PK_STR,
+      hasLeaderboardPk: !!SOAR_LEADERBOARD_PK_STR,
+      hasAuthority: !!process.env.SOAR_AUTHORITY_KEYPAIR,
+    });
 
     const connection = getConnection();
     const authority = loadAuthorityKeypair();
     const playerPk = new PublicKey(playerStr);
     const gamePk = new PublicKey(SOAR_GAME_PK_STR);
     const leaderboardPk = new PublicKey(SOAR_LEADERBOARD_PK_STR);
+
+    console.log("[SOAR] Authority:", authority.publicKey.toBase58());
+    console.log("[SOAR] Game:", gamePk.toBase58());
+    console.log("[SOAR] Leaderboard:", leaderboardPk.toBase58());
 
     const provider = new AnchorProvider(
       connection,
@@ -72,6 +86,7 @@ export default async function handler(req: any, res: any) {
     // Check if player account exists, if not — add initPlayer ix
     const [playerAccountPda] = soar.utils.derivePlayerAddress(playerPk);
     const playerAccountInfo = await connection.getAccountInfo(playerAccountPda);
+    console.log("[SOAR] Player account exists:", !!playerAccountInfo, playerAccountPda.toBase58());
     if (!playerAccountInfo) {
       const initResult = await soar.initializePlayerAccount(
         playerPk,
@@ -79,6 +94,7 @@ export default async function handler(req: any, res: any) {
         PublicKey.default
       );
       instructions.push(...initResult.transaction.instructions);
+      console.log("[SOAR] Added initPlayer ix");
     }
 
     // Check if player is registered for this leaderboard, if not — add register ix
@@ -87,12 +103,14 @@ export default async function handler(req: any, res: any) {
       leaderboardPk
     );
     const scoresInfo = await connection.getAccountInfo(playerScoresPda);
+    console.log("[SOAR] Player scores exists:", !!scoresInfo, playerScoresPda.toBase58());
     if (!scoresInfo) {
       const regResult = await soar.registerPlayerEntryForLeaderBoard(
         playerPk,
         leaderboardPk
       );
       instructions.push(...regResult.transaction.instructions);
+      console.log("[SOAR] Added registerPlayer ix");
     }
 
     // Submit score
@@ -103,6 +121,7 @@ export default async function handler(req: any, res: any) {
       new BN(totalVolumeCents)
     );
     instructions.push(...submitResult.transaction.instructions);
+    console.log("[SOAR] Added submitScore ix, total ix count:", instructions.length);
 
     // Build and sign transaction
     const tx = new Transaction().add(...instructions);
@@ -117,9 +136,11 @@ export default async function handler(req: any, res: any) {
       maxRetries: 3,
     });
 
+    console.log("[SOAR] Transaction sent:", signature);
     res.status(200).json({ ok: true, signature });
   } catch (e: any) {
-    console.error("SOAR submit error:", e);
+    console.error("[SOAR] Submit error:", e?.message || e);
+    console.error("[SOAR] Stack:", e?.stack);
     res.status(500).json({ error: e?.message || "Internal error" });
   }
 }

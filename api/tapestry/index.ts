@@ -6,6 +6,7 @@ import {
   followProfiles,
   getActivityFeed,
   getComments,
+  getIdentityForWallet,
   getProfilesByWallets,
   getTapestryClient,
   invalidateActivityFeed,
@@ -287,6 +288,17 @@ async function handleSearch(req: any, res: any) {
   });
 }
 
+async function handleIdentity(req: any, res: any) {
+  if (req.method !== "GET") {
+    return withHandler(req, res, async () => { jsonError(res, 405, "METHOD_NOT_ALLOWED", "Use GET"); });
+  }
+  return withHandler(req, res, async () => {
+    const wallet = parseWalletQuery(req);
+    const { twitter, raw } = await getIdentityForWallet(wallet);
+    jsonOk(res, { ok: true, wallet, twitter, raw });
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Main dispatcher
 // ---------------------------------------------------------------------------
@@ -302,6 +314,7 @@ const ACTIONS: Record<string, (req: any, res: any) => Promise<void>> = {
   like: handleLike,
   unlike: handleUnlike,
   search: handleSearch,
+  identity: handleIdentity,
 };
 
 export default async function handler(req: any, res: any) {

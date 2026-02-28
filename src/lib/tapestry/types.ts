@@ -46,6 +46,7 @@ export interface Roll2RollSocialProfile {
   source?: string | null;
   namespaceName?: string | null;
   namespaceReadableName?: string | null;
+  twitterHandle?: string | null;
   isFollowing?: boolean;
 }
 

@@ -52,9 +52,21 @@ export async function submitVolumeScoreViaApi(
   player: string,
   totalVolumeCents: number
 ): Promise<void> {
-  await fetch("/api/soar/submit", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ player, totalVolumeCents }),
-  });
+  console.log("[SOAR] Submitting volume score:", { player, totalVolumeCents });
+  try {
+    const res = await fetch("/api/soar/submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ player, totalVolumeCents }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      console.error("[SOAR] Submit API error:", res.status, data);
+    } else {
+      console.log("[SOAR] Submit API success:", data);
+    }
+  } catch (err) {
+    console.error("[SOAR] Submit API fetch failed:", err);
+    throw err;
+  }
 }

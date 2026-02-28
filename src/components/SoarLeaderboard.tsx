@@ -1,7 +1,9 @@
-import { Trophy, RefreshCw } from 'lucide-react';
+import { Trophy, RefreshCw, Twitter } from 'lucide-react';
 import { useSoarLeaderboard } from '../hooks/useSoarLeaderboard';
+import { useTapestryProfiles } from '../hooks/useTapestryProfiles';
 import { shortenAddr } from '../lib/addressUtils';
 import { ENABLE_SOAR_LEADERBOARD } from '../lib/constants';
+import { useNavigation } from '../contexts/NavigationContext';
 
 const MEDAL_COLORS: Record<number, string> = {
   1: 'text-amber-500',
@@ -27,11 +29,15 @@ export function SoarLeaderboard({ compact = false }: SoarLeaderboardProps) {
   if (!ENABLE_SOAR_LEADERBOARD) return null;
 
   const { entries, loading, refresh } = useSoarLeaderboard();
+  const { navigateToPlayer } = useNavigation();
   const displayCount = compact ? 5 : 20;
   const visible = entries.slice(0, displayCount);
 
+  const wallets = visible.map((e) => e.player);
+  const { profilesByWallet } = useTapestryProfiles(wallets);
+
   return (
-    <div className="col-span-1 bento-card p-4 sm:p-5 flex flex-col bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 shadow-soft">
+    <div className={`${compact ? 'col-span-1' : ''} bento-card p-4 sm:p-5 flex flex-col bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 shadow-soft`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
@@ -84,12 +90,20 @@ export function SoarLeaderboard({ compact = false }: SoarLeaderboardProps) {
           {visible.map((entry) => {
             const isTop3 = entry.rank <= 3;
             const usdcValue = (entry.score / 100).toFixed(2);
+            const profile = profilesByWallet[entry.player];
+            const displayLabel = profile?.twitterHandle
+              ? `@${profile.twitterHandle}`
+              : profile?.displayName && profile.displayName !== profile.wallet
+                ? profile.displayName
+                : shortenAddr(entry.player);
+            const avatarSrc = profile?.avatarUrl || dicebearUrl(entry.player);
             return (
-              <div
+              <button
                 key={entry.player}
-                className={`flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-colors ${
+                onClick={() => navigateToPlayer(entry.player)}
+                className={`flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-colors w-full text-left cursor-pointer ${
                   isTop3
-                    ? `border ${MEDAL_BG[entry.rank]}`
+                    ? `border ${MEDAL_BG[entry.rank]} hover:brightness-95 dark:hover:brightness-110`
                     : 'hover:bg-slate-50 dark:hover:bg-slate-700/40'
                 }`}
               >
@@ -104,21 +118,23 @@ export function SoarLeaderboard({ compact = false }: SoarLeaderboardProps) {
 
                 {/* Avatar */}
                 <img
-                  src={dicebearUrl(entry.player)}
+                  src={avatarSrc}
                   alt=""
-                  className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-700"
+                  className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-700 object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).src = dicebearUrl(entry.player); }}
                 />
 
-                {/* Address */}
-                <span className="flex-1 text-xs font-medium text-slate-700 dark:text-slate-300 truncate">
-                  {shortenAddr(entry.player)}
+                {/* Name / Handle */}
+                <span className="flex-1 text-xs font-medium text-slate-700 dark:text-slate-300 truncate flex items-center gap-1">
+                  {profile?.twitterHandle && <Twitter className="w-3 h-3 text-slate-400 flex-shrink-0" />}
+                  {displayLabel}
                 </span>
 
                 {/* Score */}
                 <span className="text-xs font-bold text-slate-900 dark:text-white tabular-nums">
                   ${usdcValue}
                 </span>
-              </div>
+              </button>
             );
           })}
         </div>

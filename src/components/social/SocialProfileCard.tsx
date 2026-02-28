@@ -1,4 +1,4 @@
-import { Users, UserPlus, UserCheck, Sparkles } from "lucide-react";
+import { Users, UserPlus, UserCheck, Sparkles, Twitter } from "lucide-react";
 import { useTapestryProfile } from "../../hooks/useTapestryProfile";
 import type { Roll2RollSocialProfile } from "../../lib/tapestry/types";
 
@@ -121,6 +121,18 @@ export function SocialProfileCard({
               <p className="text-sm text-violet-500 dark:text-violet-400 font-medium truncate">
                 @{profile.username}
               </p>
+            )}
+            {profile.twitterHandle && (
+              <a
+                href={`https://x.com/${profile.twitterHandle}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 hover:text-sky-500 dark:hover:text-sky-400 transition-colors mt-0.5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Twitter className="w-3 h-3" />
+                @{profile.twitterHandle}
+              </a>
             )}
             {profile.bio && !compact && (
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
