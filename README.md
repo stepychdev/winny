@@ -1,5 +1,8 @@
 # Winny — the fairest social jackpot on-chain (Solana)
 
+Website: https://winny-woad.vercel.app  
+Solana Program: https://solscan.io/account/3wi11KBqF3Qa7JPP6CH4AFrcXbvaYEXMsEr9cmWQy8Zj
+
 Winny is an on-chain SocialFi jackpot game on Solana.
 
 Players can join rounds with USDC or with any supported SPL asset in their wallet. If the asset is not USDC, Winny routes it through Jupiter and normalizes the entry into real received USDC, so tickets are always based on actual value received on-chain:
