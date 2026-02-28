@@ -7,7 +7,7 @@ Winny is an on-chain SocialFi jackpot game on Solana.
 
 Players can join rounds with USDC or with any supported SPL asset in their wallet. If the asset is not USDC, Winny routes it through Jupiter and normalizes the entry into real received USDC, so tickets are always based on actual value received on-chain:
 
-**`$1 = 1 ticket`**
+**`$1 = 100 ticket`**
 
 ---
 
