@@ -856,23 +856,43 @@ export function useJackpot(): JackpotState {
 
         // Wait for round to exist — crank creates it after settling the previous one.
         // Retry a few times with short delays instead of failing immediately.
+        // If the expected roundId doesn't exist, scan nearby IDs for an open round.
+        let effectiveRoundId = roundId;
         const roundPda = getRoundPda(roundId);
         let roundInfo = await connection.getAccountInfo(roundPda);
         if (!roundInfo) {
           setAutoStatus("Waiting for round to be created...");
-          const MAX_RETRIES = 8;
+          const MAX_RETRIES = 6;
           const RETRY_DELAY_MS = 2000;
           for (let attempt = 0; attempt < MAX_RETRIES && !roundInfo; attempt++) {
             await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
             roundInfo = await connection.getAccountInfo(roundPda);
           }
+          // If still not found, scan nearby round IDs for an open round
           if (!roundInfo) {
-            throw new Error("Round not created yet. Please wait a moment and try again.");
+            setAutoStatus("Searching for open round...");
+            let foundId = 0;
+            const scanIds = [roundId - 1, roundId + 1, roundId - 2, roundId + 2, roundId + 3];
+            for (const candidateId of scanIds) {
+              if (candidateId < 1) continue;
+              const data = await fetchRound(connection, candidateId);
+              if (data && data.status === RoundStatus.Open) {
+                foundId = candidateId;
+                break;
+              }
+            }
+            if (foundId > 0) {
+              effectiveRoundId = foundId;
+              setRoundId(foundId);
+              roundInfo = await connection.getAccountInfo(getRoundPda(foundId));
+            } else {
+              throw new Error("Round not created yet. Please wait a moment and try again.");
+            }
           }
         }
 
         // Verify round is still Open before sending deposit
-        const freshRound = await fetchRound(connection, roundId);
+        const freshRound = await fetchRound(connection, effectiveRoundId);
         if (!freshRound || freshRound.status !== RoundStatus.Open) {
           throw new Error("Round is no longer accepting deposits.");
         }
@@ -1034,7 +1054,7 @@ export function useJackpot(): JackpotState {
           const chunkDepositIx = await buildDepositAny(
             program,
             publicKey,
-            roundId,
+            effectiveRoundId,
             chunkUsdcBalanceBefore,
             chunkMinOutTotal,
             USDC_MINT
