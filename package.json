@@ -32,6 +32,7 @@
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.1",
     "@emotion/react": "^11.13.3",
+    "@magicblock-labs/soar-sdk": "^0.1.23",
     "@metaplex-foundation/mpl-token-metadata": "^3.4.0",
     "@metaplex-foundation/umi": "^1.5.1",
     "@metaplex-foundation/umi-bundle-defaults": "^1.5.1",

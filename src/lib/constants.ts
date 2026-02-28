@@ -98,3 +98,9 @@ export type DegenModeStatusType =
 
 export const DEGEN_FALLBACK_REASON_NO_VIABLE_ROUTE = 1;
 export const DEGEN_FALLBACK_REASON_TIMEOUT = 2;
+
+// ─── SOAR Leaderboard ────────────────────────────────────────
+export const SOAR_PROGRAM_ID = new PublicKey("SoarNNzwQHMwcfdkdLc6kvbkoMSxcHy89gTHrjhJYkk");
+export const SOAR_GAME_PK = new PublicKey("GX2oS4iPJr2rZYGmp9V8WVVuabfQhwE4b5MESrBaozgy");
+export const SOAR_LEADERBOARD_PK = new PublicKey("5mSCXFNAxiHjxDsmvMnJVstAdT5uiiDJ4gRhHM5rNfUB");
+export const ENABLE_SOAR_LEADERBOARD = IS_MAINNET;

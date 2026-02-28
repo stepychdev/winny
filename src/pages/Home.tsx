@@ -19,11 +19,13 @@ import { SocialActivityCard } from '../components/social/SocialActivityCard';
 import { useJackpotContext } from '../contexts/JackpotContext';
 import type { DepositLegInput } from '../hooks/useJackpot';
 import { getRoundPda } from '../lib/program';
-import { ROUND_DURATION_SEC, SOLSCAN_CLUSTER_QUERY, USDC_MINT, WHEEL_RESULT_REVEAL_DELAY_MS, MIN_TOTAL_TICKETS, TICKET_UNIT, USDC_DECIMALS, ENABLE_MULTI_DEPOSIT, ENABLE_TAPESTRY_SOCIAL } from '../lib/constants';
+import { ROUND_DURATION_SEC, SOLSCAN_CLUSTER_QUERY, USDC_MINT, WHEEL_RESULT_REVEAL_DELAY_MS, MIN_TOTAL_TICKETS, TICKET_UNIT, USDC_DECIMALS, ENABLE_MULTI_DEPOSIT, ENABLE_TAPESTRY_SOCIAL, ENABLE_SOAR_LEADERBOARD } from '../lib/constants';
 import { formatUsdc, formatUsdcCompact } from '../lib/format';
 import { shouldShowCancelRefundCard } from '../lib/roundUi';
 import { importOrCreateTapestryProfile, publishTapestryEvent } from '../lib/tapestry/api';
 import { emitFeedRefresh } from '../lib/tapestry/events';
+import { submitVolumeScoreViaApi } from '../lib/soar';
+import { SoarLeaderboard } from '../components/SoarLeaderboard';
 
 const FEE_RATE = 0.0025;
 
@@ -124,6 +126,10 @@ export function Home() {
       const sig = await jackpot.deposit(amount, mint, quote);
       const isJupiterSwap = mint !== USDC_MINT.toBase58();
       missionsApi.trackDeposit(amount, isJupiterSwap);
+      if (ENABLE_SOAR_LEADERBOARD && walletAddress) {
+        const totalVolumeCents = Math.floor((missionsApi.stats.totalVolume + amount) * 100);
+        submitVolumeScoreViaApi(walletAddress, totalVolumeCents).catch(() => {});
+      }
       refetchTokens(); // refresh wallet token list after deposit
       // Publish deposit event to Tapestry social feed (fire-and-forget)
       if (walletAddress) {
@@ -145,6 +151,10 @@ export function Home() {
       const hasJupiterSwap = legs.some((leg) => (leg.mint || USDC_MINT.toBase58()) !== USDC_MINT.toBase58());
       const totalInputAmount = legs.reduce((sum, leg) => sum + (Number.isFinite(leg.amount) ? leg.amount : 0), 0);
       missionsApi.trackDeposit(totalInputAmount, hasJupiterSwap);
+      if (ENABLE_SOAR_LEADERBOARD && walletAddress) {
+        const totalVolumeCents = Math.floor((missionsApi.stats.totalVolume + totalInputAmount) * 100);
+        submitVolumeScoreViaApi(walletAddress, totalVolumeCents).catch(() => {});
+      }
       refetchTokens();
       // Publish deposit event to Tapestry social feed (fire-and-forget)
       if (walletAddress) {
@@ -344,6 +354,9 @@ export function Home() {
           <div className="col-span-1 lg:row-span-2 bento-card p-0 flex flex-col shadow-soft overflow-hidden bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
             <Chat />
           </div>
+
+          {/* ── Volume Leaderboard ── */}
+          <SoarLeaderboard compact />
 
           {connected && ENABLE_TAPESTRY_SOCIAL && (
             <>
