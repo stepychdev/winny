@@ -17,6 +17,14 @@ import { PlayerProfile } from './pages/PlayerProfile';
 
 import '@solana/wallet-adapter-react-ui/styles.css';
 
+function deriveWsEndpoint(rpcHttpUrl: string): string {
+  // Solana Connection expects a WS endpoint for subscriptions.
+  // Convert http(s) RPC URL into ws(s) to avoid fallback to /api/* routes.
+  if (rpcHttpUrl.startsWith('https://')) return `wss://${rpcHttpUrl.slice('https://'.length)}`;
+  if (rpcHttpUrl.startsWith('http://')) return `ws://${rpcHttpUrl.slice('http://'.length)}`;
+  return rpcHttpUrl;
+}
+
 // In production mainnet, always route through the serverless proxy
 // so the RPC API key stays server-side and is never exposed to visitors.
 // For local dev, use VITE_RPC_URL if set, otherwise fall back to public endpoint.
@@ -25,6 +33,16 @@ const RPC_ENDPOINT =
     ? `${window.location.origin}/api/solana-rpc`
     : ((import.meta.env.VITE_RPC_URL as string | undefined)?.trim() ||
        clusterApiUrl(SOLANA_NETWORK === 'mainnet' ? 'mainnet-beta' : 'devnet'));
+
+const WS_ENDPOINT = (() => {
+  const rpcProxy = (import.meta.env.VITE_RPC_PROXY_URL as string | undefined)?.trim();
+  const rpcFallback = (import.meta.env.VITE_RPC_URL as string | undefined)?.trim();
+  const base =
+    rpcProxy ||
+    rpcFallback ||
+    clusterApiUrl(SOLANA_NETWORK === 'mainnet' ? 'mainnet-beta' : 'devnet');
+  return deriveWsEndpoint(base);
+})();
 
 function PageRouter() {
   const { page } = useNavigation();
@@ -44,9 +62,10 @@ function App() {
     new PhantomWalletAdapter(),
     new SolflareWalletAdapter(),
   ], []);
+  const connectionConfig = useMemo(() => ({ wsEndpoint: WS_ENDPOINT }), []);
 
   return (
-    <ConnectionProvider endpoint={RPC_ENDPOINT}>
+    <ConnectionProvider endpoint={RPC_ENDPOINT} config={connectionConfig}>
       <WalletProvider wallets={wallets} autoConnect>
         <WalletModalProvider>
           <ThemeProvider>
