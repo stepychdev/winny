@@ -9,6 +9,30 @@ export interface LeaderboardEntry {
 }
 
 /**
+ * Check whether a player's SOAR account is initialized and registered
+ * for our leaderboard.  Pure read — no transaction needed.
+ */
+export async function checkSoarPlayerStatus(
+  connection: Connection,
+  playerPk: PublicKey
+): Promise<{ initialized: boolean; registered: boolean }> {
+  const soar = SoarProgram.getFromConnection(connection, playerPk);
+
+  const [playerAccountPda] = soar.utils.derivePlayerAddress(playerPk);
+  const playerAccountInfo = await connection.getAccountInfo(playerAccountPda);
+  const initialized = !!playerAccountInfo;
+
+  if (!initialized) return { initialized: false, registered: false };
+
+  const [playerScoresPda] = soar.utils.derivePlayerScoresListAddress(
+    playerPk,
+    SOAR_LEADERBOARD_PK
+  );
+  const scoresInfo = await connection.getAccountInfo(playerScoresPda);
+  return { initialized, registered: !!scoresInfo };
+}
+
+/**
  * Fetch the top entries from the SOAR leaderboard.
  * Returns entries sorted by score (descending) with rank.
  */
