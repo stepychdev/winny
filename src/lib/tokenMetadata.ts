@@ -1,4 +1,5 @@
 import { Connection, PublicKey } from "@solana/web3.js";
+import { jupiterFetchJson } from "./jupiterApi";
 
 const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
   "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
@@ -103,16 +104,22 @@ export async function fetchTokenMetadata(
     const parsed = parseMetadataAccount(accountInfo.data as Buffer);
     if (!parsed || !parsed.uri) return null;
 
-    // Fetch JSON from URI to get image
+    // Race: try Jupiter logo (fast CDN) and Metaplex URI in parallel
     let image = "";
     try {
-      const res = await fetch(parsed.uri);
-      if (res.ok) {
-        const json = await res.json();
-        image = json.image || "";
-      }
+      const [jupLogo, metaplexResult] = await Promise.allSettled([
+        fetchTokenLogoViaJupiter(mintStr),
+        fetch(parsed.uri, { signal: AbortSignal.timeout(6_000) })
+          .then(r => r.ok ? r.json() : null)
+          .then(json => json?.image || "")
+          .catch(() => ""),
+      ]);
+
+      const jupImage = jupLogo.status === "fulfilled" ? jupLogo.value : "";
+      const metaplexImage = metaplexResult.status === "fulfilled" ? metaplexResult.value : "";
+      image = jupImage || metaplexImage;
     } catch {
-      // URI fetch failed, use empty image
+      // Both failed
     }
 
     const result: TokenMetadataResult = {
@@ -173,15 +180,23 @@ export async function fetchTokenMetadataBatch(
 
     uriPromises.push(
       (async () => {
+        // Race: try Jupiter logo (fast CDN) and Metaplex URI in parallel
         let image = "";
         try {
-          const res = await fetch(parsed.uri);
-          if (res.ok) {
-            const json = await res.json();
-            image = json.image || "";
-          }
+          const [jupLogo, metaplexResult] = await Promise.allSettled([
+            fetchTokenLogoViaJupiter(mintStr),
+            fetch(parsed.uri, { signal: AbortSignal.timeout(6_000) })
+              .then(r => r.ok ? r.json() : null)
+              .then(json => json?.image || "")
+              .catch(() => ""),
+          ]);
+
+          const jupImage = jupLogo.status === "fulfilled" ? jupLogo.value : "";
+          const metaplexImage = metaplexResult.status === "fulfilled" ? metaplexResult.value : "";
+          // Prefer Jupiter (CDN-backed, faster loading in browser) over Metaplex URI
+          image = jupImage || metaplexImage;
         } catch {
-          // URI fetch failed
+          // Both failed
         }
 
         const result: TokenMetadataResult = {
@@ -202,8 +217,86 @@ export async function fetchTokenMetadataBatch(
 }
 
 /**
+ * Fetch token logos from Jupiter Token API (fast CDN-backed images).
+ * Uses /tokens/v2/search endpoint per mint. Results are merged into the cache.
+ */
+const jupiterLogoCache = new Map<string, string>();
+const jupiterLogoInflight = new Map<string, Promise<string>>();
+
+export async function fetchTokenLogoViaJupiter(mint: string): Promise<string> {
+  const cached = jupiterLogoCache.get(mint);
+  if (cached !== undefined) return cached;
+
+  // De-duplicate in-flight requests
+  const existing = jupiterLogoInflight.get(mint);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    try {
+      const rows = await jupiterFetchJson<any[]>(
+        `/tokens/v2/search?query=${encodeURIComponent(mint)}`,
+        { timeoutMs: 4_000, retries: 1 },
+      );
+      const token = Array.isArray(rows)
+        ? rows.find((r) => (r.id || r.address || r.mint) === mint)
+        : null;
+      const logo = token?.logoURI || token?.icon || "";
+      jupiterLogoCache.set(mint, logo);
+      return logo;
+    } catch {
+      jupiterLogoCache.set(mint, "");
+      return "";
+    } finally {
+      jupiterLogoInflight.delete(mint);
+    }
+  })();
+
+  jupiterLogoInflight.set(mint, promise);
+  return promise;
+}
+
+/**
+ * Batch-fetch token logos from Jupiter for multiple mints.
+ * Fires requests in parallel (capped at 5 concurrency).
+ */
+export async function fetchTokenLogosBatchViaJupiter(
+  mints: string[],
+): Promise<Map<string, string>> {
+  const results = new Map<string, string>();
+  const toFetch: string[] = [];
+
+  for (const m of mints) {
+    const cached = jupiterLogoCache.get(m);
+    if (cached !== undefined) {
+      results.set(m, cached);
+    } else {
+      toFetch.push(m);
+    }
+  }
+
+  if (toFetch.length === 0) return results;
+
+  // Cap concurrency at 5
+  const CONCURRENCY = 5;
+  for (let i = 0; i < toFetch.length; i += CONCURRENCY) {
+    const batch = toFetch.slice(i, i + CONCURRENCY);
+    const settled = await Promise.allSettled(
+      batch.map((m) => fetchTokenLogoViaJupiter(m).then((logo) => ({ mint: m, logo }))),
+    );
+    for (const r of settled) {
+      if (r.status === "fulfilled") {
+        results.set(r.value.mint, r.value.logo);
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
  * Clear the metadata cache (useful for testing).
  */
 export function clearMetadataCache() {
   cache.clear();
+  jupiterLogoCache.clear();
 }

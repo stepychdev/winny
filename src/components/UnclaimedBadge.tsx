@@ -1,12 +1,19 @@
 import { useState } from 'react';
 import { Trophy, X, Loader2 } from 'lucide-react';
 import type { UnclaimedPrize } from '../hooks/useJackpot';
+import { pushNotification } from '../hooks/useNotifications';
 
 interface UnclaimedBadgeProps {
   prize: UnclaimedPrize;
   loading: boolean;
   onClaim: (roundId: number) => Promise<string>;
-  onClaimDegen: (roundId: number) => Promise<unknown>;
+  onClaimDegen: (roundId: number) => Promise<{
+    claimSig: string;
+    tokenMint: string | null;
+    tokenIndex: number | null;
+    tokenSymbol: string | null;
+    fallback: boolean;
+  }>;
 }
 
 export function UnclaimedBadge({ prize, loading, onClaim, onClaimDegen }: UnclaimedBadgeProps) {
@@ -34,8 +41,27 @@ export function UnclaimedBadge({ prize, loading, onClaim, onClaimDegen }: Unclai
     setClaimingMode("degen");
     setError(null);
     try {
-      await onClaimDegen(prize.roundId);
+      const result = await onClaimDegen(prize.roundId);
       setSuccess(true);
+      if (result.fallback) {
+        pushNotification({
+          type: 'win',
+          title: `Round #${prize.roundId} — Degen Fallback`,
+          detail: `$${prize.payout.toFixed(2)} USDC (no viable route)`,
+        });
+      } else if (result.tokenSymbol) {
+        pushNotification({
+          type: 'win',
+          title: `Round #${prize.roundId} — ${result.tokenSymbol}`,
+          detail: `$${prize.payout.toFixed(2)} swapped to ${result.tokenSymbol}`,
+        });
+      } else {
+        pushNotification({
+          type: 'win',
+          title: `Round #${prize.roundId} — Degen Pending`,
+          detail: `$${prize.payout.toFixed(2)} — executor picking route…`,
+        });
+      }
     } catch (e: any) {
       setError(e.message?.slice(0, 50) || 'Degen claim failed');
     } finally {

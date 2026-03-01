@@ -48,6 +48,16 @@ import {
 
 const POLL_MS = Number(process.env.DEGEN_EXECUTOR_POLL_MS || 5000);
 
+// Prevent crash on transient WebSocket errors (e.g. RPC WS timeout during confirmTransaction)
+process.on("unhandledRejection", (err) => {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (msg.includes("ws error") || msg.includes("ETIMEDOUT") || msg.includes("WebSocket")) {
+    console.warn(`[degen-executor] suppressed WS error: ${msg}`);
+    return;
+  }
+  console.error("[degen-executor] unhandledRejection:", err);
+});
+
 /** Escalating slippage sequence: start tight, widen on failure. Jupiter anti-MEV
  *  means higher slippage doesn't worsen execution — only lowers the revert threshold. */
 const SLIPPAGE_SEQUENCE = (process.env.DEGEN_EXECUTOR_SLIPPAGE_SEQUENCE || "300,400,500,600")

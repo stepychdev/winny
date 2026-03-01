@@ -1,9 +1,15 @@
 {
-  "poolVersion": 1,
+  "poolVersion": 2,
   "source": "jupiter-verified",
-  "generatedAt": "2026-02-27T07:42:59.140Z",
-  "tokenCount": 4533,
-  "snapshotSha256": "2bc963513778c7a45a8800c2a1dc99e1dd8f25d2c1ac25d274292f9b5f52a79e",
+  "generatedAt": "2026-03-01T06:46:03.373Z",
+  "tokenCount": 4534,
+  "snapshotSha256": "e96e43be6dd5e040e028aaa5cd5d8b14436dd51a85a0f630779fa74ce548dd8c",
+  "stats": {
+    "totalVerified": 4534,
+    "splToken": 4012,
+    "token2022": 522,
+    "invalidOwner": 0
+  },
   "tokens": [
     {
       "mint": "123mYEnRLM2LLYsJW3K6oyYh8uP1fngj732iG638ondo",
@@ -5397,7 +5403,7 @@
       "mint": "865GVDdESzXiNvygSUt7yFeJLrXDyn5UpGNfYuxfpump",
       "symbol": "HENRY",
       "name": "World's Tiniest Penguin",
-      "logoURI": "http://139.99.135.28:5013/img/O2hsOzFFft"
+      "logoURI": "https://pbs.twimg.com/media/HBsCS48XoAAAiPa?format=jpg&name=900x900"
     },
     {
       "mint": "86BMwo29TgobuYTCFU7tf3DBhgNvgeCkNTQXbAvUpump",
@@ -8164,6 +8170,12 @@
       "symbol": "CFSM",
       "name": "Flying Spaghetti Monster",
       "logoURI": "https://ipfs.io/ipfs/Qmd6jm8CvoAfxaBXXwR9cYphDsQuTAuRcdWvXbCspnqh4p"
+    },
+    {
+      "mint": "atVjZ7uM8sVrLFi5Xe1JiLGW6mW9pvQdTCWzhNFpump",
+      "symbol": "Peace",
+      "name": "World Peace ",
+      "logoURI": "https://ipfs.io/ipfs/QmdYhJTQGHJjvqFirELJmTNrL67NVfSBY3T2GH8Kb7psH2"
     },
     {
       "mint": "ATvV475xNu3qZe6ZFcuHeieftruYxHbvnGbZPqoPjups",
@@ -12126,12 +12138,6 @@
       "logoURI": "https://bafybeibqz4chze636s7ypnob4xogp7vobosqsbwmeu36w4x62iyqb6n6hm.ipfs.cf-ipfs.com/"
     },
     {
-      "mint": "EdevXsYfsBhQY3BSs1RD6R6izKjHBhj7EBN7446apump",
-      "symbol": "FOMO",
-      "name": "Just a FOMO Guy AI",
-      "logoURI": "https://ipfs.io/ipfs/QmX2BppLbiC4zQ4c8Adeq8NtyfQ6GK7jtZb3Dtemz4Bvxo"
-    },
-    {
       "mint": "edge86g9cVz87xcpKpy3J77vbp4wYd9idEV562CCntt",
       "symbol": "edgeSOL",
       "name": "Edgevana Staked SOL",
@@ -13338,6 +13344,12 @@
       "logoURI": "https://ipfs.io/ipfs/QmUJDKq8UdL3TyVxd3uMZsFsF1JVqN3a36LVm7Sp2fvUKT"
     },
     {
+      "mint": "FHVnDUfMwkipvnBDpJMoiP4mvnnMVmsCWqAMYGBapump",
+      "symbol": "Eugene",
+      "name": "Eugene",
+      "logoURI": "https://metadata.rapidlaunch.io/images/14372d38-575f-4d62-ad7f-d35efef710c6.png"
+    },
+    {
       "mint": "Fi5GayacZzUrfaCRCJtBz2vSYkGF56xjgCceZx5SbXwq",
       "symbol": "wifSOL",
       "name": "wifSOL",
@@ -13552,12 +13564,6 @@
       "symbol": "foxySOL",
       "name": "Famous Fox Federation Staked SOL",
       "logoURI": "https://arweave.net/dmOQJCClFh3xDCmgL9GE2FdcOfV01-c9H1Nm3xKhlSE"
-    },
-    {
-      "mint": "FoXyMu5xwXre7zEoSvzViRk3nGawHUp9kUh97y2NDhcq",
-      "symbol": "FOXY",
-      "name": "Famous Fox Federation",
-      "logoURI": "https://dens.famousfoxes.com/foxy.png"
     },
     {
       "mint": "FP2XnGpqP5opNZujB6KPpXYWSAwq7BbTUVUnRij1bonk",
@@ -16036,6 +16042,12 @@
       "symbol": "raSOL",
       "name": "Hubra staked SOL",
       "logoURI": "https://rofhoha4x5vjghkxetrvnog7pxe2xjnslpc3q52hkr6pxmsluz6a.arweave.net/i4p3HBy_apMdVyTjVrjffcmrpbJbxbh3R1R8-7JLpnw"
+    },
+    {
+      "mint": "Huh3G975pLP3WTXKDnsaCTu7enAoFsHMFJCbFLeNpump",
+      "symbol": "FOMO",
+      "name": "FOMO",
+      "logoURI": "https://ipfs.io/ipfs/bafybeic3x3olu5jmjdfukigpxj2phmanzvlfw2r3gbtsszpe32fd7g6ih4"
     },
     {
       "mint": "HUMA1821qVDKta3u2ovmfDQeW2fSQouSKE8fkF44wvGw",

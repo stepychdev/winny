@@ -1,3 +1,4 @@
+import { useState, useCallback } from 'react';
 import { Header } from '../components/Header';
 import { PROGRAM_ID as PROGRAM_ID_PK, SOLSCAN_CLUSTER_QUERY } from '../lib/constants';
 import {
@@ -12,6 +13,8 @@ import {
   CheckCircle,
   User,
   ArrowRight,
+  Search,
+  Check,
 } from 'lucide-react';
 
 const PROGRAM_ID = PROGRAM_ID_PK.toBase58();
@@ -20,7 +23,54 @@ function copyToClipboard(text: string) {
   navigator.clipboard.writeText(text).catch(() => {});
 }
 
+/**
+ * Reproduce the on-chain winning ticket derivation:
+ *   bytes16 = randomness[0..16]  (little-endian u128)
+ *   winning_ticket = (bytes16 % total_tickets) + 1
+ */
+function deriveWinningTicket(randomnessHex: string, totalTickets: string): { ticket: string; error: string | null } {
+  try {
+    const hex = randomnessHex.replace(/^0x/i, '').replace(/\s/g, '');
+    if (!/^[0-9a-fA-F]{64}$/.test(hex)) return { ticket: '', error: 'Randomness must be exactly 64 hex characters (32 bytes)' };
+
+    const totalBig = BigInt(totalTickets);
+    if (totalBig <= 0n) return { ticket: '', error: 'Total tickets must be > 0' };
+
+    // First 16 bytes as little-endian u128
+    const first16Hex = hex.slice(0, 32); // 16 bytes = 32 hex chars
+    const bytes = [];
+    for (let i = 0; i < 32; i += 2) {
+      bytes.push(parseInt(first16Hex.slice(i, i + 2), 16));
+    }
+    // Little-endian: byte[0] is LSB
+    let r = 0n;
+    for (let i = 0; i < 16; i++) {
+      r |= BigInt(bytes[i]) << (8n * BigInt(i));
+    }
+
+    const ticket = (r % totalBig) + 1n;
+    return { ticket: ticket.toString(), error: null };
+  } catch {
+    return { ticket: '', error: 'Invalid input' };
+  }
+}
+
 export function Fairness() {
+  const [vrfRandomness, setVrfRandomness] = useState('');
+  const [vrfTotalTickets, setVrfTotalTickets] = useState('');
+  const [vrfResult, setVrfResult] = useState<{ ticket: string; error: string | null } | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const handleVerify = useCallback(() => {
+    setVrfResult(deriveWinningTicket(vrfRandomness, vrfTotalTickets));
+  }, [vrfRandomness, vrfTotalTickets]);
+
+  const handleCopy = useCallback((text: string, field: string) => {
+    copyToClipboard(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 1500);
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col bg-background dark:bg-[#0f1219] text-slate-900 dark:text-slate-100">
       <Header />
@@ -99,47 +149,77 @@ export function Fairness() {
               </div>
             </div>
 
-            {/* 2. Live Verification */}
+            {/* 2. VRF Hash Verification Tool */}
             <div className="group relative col-span-1 overflow-hidden rounded-2xl bg-white dark:bg-slate-800 p-6 shadow-sm ring-1 ring-slate-900/5 dark:ring-slate-700 transition hover:shadow-md">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Live Verification</h3>
-                <span className="relative flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
-                </span>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Verify VRF Result</h3>
+                <Search className="w-5 h-5 text-primary" />
               </div>
-              <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-4 font-mono text-xs border border-slate-100 dark:border-slate-700 h-48 overflow-y-auto hide-scrollbar">
-                <div className="mb-3 pb-3 border-b border-slate-200 dark:border-slate-700">
-                  <span className="text-slate-400 block mb-1">Round Data</span>
-                  <div className="flex justify-between text-slate-600 dark:text-slate-300">
-                    <span>Seed:</span>
-                    <span className="text-primary truncate ml-2">4x99...a8z2</span>
-                  </div>
-                  <div className="flex justify-between text-slate-600 dark:text-slate-300 mt-1">
-                    <span>Result:</span>
-                    <span className="text-green-600 dark:text-green-400 font-bold">Winner (x2.5)</span>
-                  </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+                Paste VRF randomness (hex) and total tickets from any round to independently verify the winning ticket.
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider block mb-1">
+                    VRF Randomness (64 hex chars)
+                  </label>
+                  <input
+                    type="text"
+                    value={vrfRandomness}
+                    onChange={(e) => setVrfRandomness(e.target.value)}
+                    placeholder="e.g. a1b2c3d4..."
+                    className="w-full rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-mono text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
                 </div>
-                <div className="mb-3 pb-3 border-b border-slate-200 dark:border-slate-700 opacity-60">
-                  <span className="text-slate-400 block mb-1">Previous Round</span>
-                  <div className="flex justify-between text-slate-600 dark:text-slate-300">
-                    <span>Seed:</span>
-                    <span className="text-primary truncate ml-2">9k22...p1m9</span>
-                  </div>
-                  <div className="flex justify-between text-slate-600 dark:text-slate-300 mt-1">
-                    <span>Result:</span>
-                    <span className="text-slate-500 font-bold">Completed</span>
-                  </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider block mb-1">
+                    Total Tickets
+                  </label>
+                  <input
+                    type="text"
+                    value={vrfTotalTickets}
+                    onChange={(e) => setVrfTotalTickets(e.target.value)}
+                    placeholder="e.g. 50000000"
+                    className="w-full rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-mono text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
                 </div>
+                <button
+                  onClick={handleVerify}
+                  disabled={!vrfRandomness || !vrfTotalTickets}
+                  className="w-full py-2.5 rounded-lg bg-primary text-white text-sm font-bold transition-all hover:bg-primary/90 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Verify Winning Ticket
+                </button>
+                {vrfResult && (
+                  <div className={`rounded-lg p-3 border text-xs font-mono ${
+                    vrfResult.error
+                      ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400'
+                      : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-400'
+                  }`}>
+                    {vrfResult.error ? (
+                      <span>{vrfResult.error}</span>
+                    ) : (
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 dark:text-slate-400">Winning Ticket:</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-primary text-sm">{vrfResult.ticket}</span>
+                            <button onClick={() => handleCopy(vrfResult.ticket, 'ticket')} className="text-slate-400 hover:text-primary transition-colors">
+                              {copiedField === 'ticket' ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="text-[10px] text-slate-400 dark:text-slate-500 pt-1 border-t border-slate-200 dark:border-slate-700">
+                          Formula: u128_le(randomness[0..16]) % total_tickets + 1
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <a
-                href={`https://solscan.io/account/${PROGRAM_ID}${SOLSCAN_CLUSTER_QUERY}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-4 w-full text-center text-sm font-semibold text-primary hover:text-primary/80 transition-colors flex items-center justify-center gap-1"
-              >
-                Verify on Explorer <ArrowRight className="w-3.5 h-3.5" />
-              </a>
+              <p className="mt-3 text-[10px] text-slate-400 dark:text-slate-500">
+                Copy VRF data from any round detail page and verify here.
+              </p>
             </div>
 
             {/* 3. RTP & Fees */}

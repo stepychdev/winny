@@ -1,5 +1,5 @@
-export const DEGEN_POOL_VERSION = 1;
-export const DEGEN_POOL_SNAPSHOT_SHA256 = "2bc963513778c7a45a8800c2a1dc99e1dd8f25d2c1ac25d274292f9b5f52a79e";
+export const DEGEN_POOL_VERSION = 2;
+export const DEGEN_POOL_SNAPSHOT_SHA256 = "e96e43be6dd5e040e028aaa5cd5d8b14436dd51a85a0f630779fa74ce548dd8c";
 export const DEGEN_POOL = [
   "123mYEnRLM2LLYsJW3K6oyYh8uP1fngj732iG638ondo",
   "128qNYovdGv2YqayErcJgU7gDwbNVX1VuoxbtWz8ondo",
@@ -1361,6 +1361,7 @@ export const DEGEN_POOL = [
   "AtpNJ7mtMCYPCeXkZCshGKtU98gcbHvyorbo8dptWoxk",
   "ATRLuHph8dxnPny4WSNW7fxkhbeivBrtWbY6BfB4xpLj",
   "AtTUzJVrPkBTXwiMZivVRKvWmCnVpRfnKq3cc5fopump",
+  "atVjZ7uM8sVrLFi5Xe1JiLGW6mW9pvQdTCWzhNFpump",
   "ATvV475xNu3qZe6ZFcuHeieftruYxHbvnGbZPqoPjups",
   "ATygpFdY1KUVn5YLB1CU6L9Xg5Z1FAY9qimtEae3wBLV",
   "AU7qdyo8dpE22b4Xuw6BUs4fDgirXAi8rqczEpDFHJne",
@@ -2021,7 +2022,6 @@ export const DEGEN_POOL = [
   "Ed1yisBEAo8UXToSswvVFgzyJKpF48HEdq5kvz2zpump",
   "ED5nyyWEzpPPiWimP8vYm7sD7TD3LAt3Q3gRTWHzPJBY",
   "EDavhezsuNnhdoAKPExWaMtnuhq6FVqoBYnyFEJLLBqC",
-  "EdevXsYfsBhQY3BSs1RD6R6izKjHBhj7EBN7446apump",
   "edge86g9cVz87xcpKpy3J77vbp4wYd9idEV562CCntt",
   "EdhTCqUxXRWQcUd5Fonyz9rapHAB6mABAuVkmPrtpump",
   "Edik9MoFp8LAXS9HNu2gRFyihwYqDqv4ZmNmVT9ondo",
@@ -2223,6 +2223,7 @@ export const DEGEN_POOL = [
   "Fh7mLxtPAysdvHcMcJ37A3vc6WvBVh7JVDwxmwk6pump",
   "FhhXCnCbxBQ4nX4a4PBTuYG3gbETWixoNejQkPKJbonk",
   "FhvBDEr46meW6NHWHNeShDzvbXWabNzyT6uGinEgBAGS",
+  "FHVnDUfMwkipvnBDpJMoiP4mvnnMVmsCWqAMYGBapump",
   "Fi5GayacZzUrfaCRCJtBz2vSYkGF56xjgCceZx5SbXwq",
   "Fishy64jCaa3ooqXw7BHtKvYD8BTkSyAPh6RNE3xZpcN",
   "FJjKH9Xp2SvNDNUSN7X9T4uMNafFEYzbZpnwEZXKpump",
@@ -2259,7 +2260,6 @@ export const DEGEN_POOL = [
   "Fosp9yoXQBdx8YqyURZePYzgpCnxp9XsfnQq69DRvvU4",
   "FovBwhoV5KQjZCdhoM6jgXYwXLX3F8vgAfvmLH7ondo",
   "FoxYewmpjh66W6PFA38k2JRYea22mxnwLLMkVmu5bNU",
-  "FoXyMu5xwXre7zEoSvzViRk3nGawHUp9kUh97y2NDhcq",
   "FP2XnGpqP5opNZujB6KPpXYWSAwq7BbTUVUnRij1bonk",
   "fpSoL8EJ7UA5yJxFKWk1MFiWi35w8CbH36G5B9d7DsV",
   "FQ1tyso61AH1tzodyJfSwmzsD3GToybbRNoZxUBz21p8",
@@ -2673,6 +2673,7 @@ export const DEGEN_POOL = [
   "HtrvP4fG9KiFqFeu4f32RuZiwG3nmYwPkPZ61nAbpump",
   "HtTYHz1Kf3rrQo6AqDLmss7gq5WrkWAaXn3tupUZbonk",
   "HUBsveNpjo5pWqNkH57QzxjQASdTVXcSK7bVKTSZtcSX",
+  "Huh3G975pLP3WTXKDnsaCTu7enAoFsHMFJCbFLeNpump",
   "HUMA1821qVDKta3u2ovmfDQeW2fSQouSKE8fkF44wvGw",
   "HUPfpnsaJtJGpJxAPNX1vXah7BgYiQYt1c2JMgMumvPs",
   "HUSTLFV3U5Km8u66rMQExh4nLy7unfKHedEXVK1WgSAG",

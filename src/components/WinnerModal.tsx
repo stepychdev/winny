@@ -3,6 +3,8 @@ import { Trophy, X, Loader2, Shuffle, Zap } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { useTapestryProfile } from '../hooks/useTapestryProfile';
 import { useNavigation } from '../contexts/NavigationContext';
+import { pushNotification } from '../hooks/useNotifications';
+import { fetchTokenLogoViaJupiter } from '../lib/tokenMetadata';
 
 interface WinnerModalProps {
   isOpen: boolean;
@@ -31,6 +33,7 @@ interface WinnerModalProps {
 interface RevealedDegenToken {
   mint: string;
   symbol: string;
+  logoUrl: string;
 }
 
 export function WinnerModal({
@@ -78,16 +81,37 @@ export function WinnerModal({
       if (result.fallback) {
         setDegenToken(null);
         setDegenStatus('No viable degen route found. Claimed in USDC.');
+        pushNotification({
+          type: 'win',
+          title: 'Degen Claim — Fallback to USDC',
+          detail: `$${winner.payout.toFixed(2)} USDC (no viable degen route)`,
+        });
       } else if (!result.tokenMint) {
         setDegenToken(null);
         setDegenStatus('Degen mode locked. Waiting for executor to pick the first viable VRF-derived route.');
+        pushNotification({
+          type: 'win',
+          title: 'Degen Claim Pending',
+          detail: `$${winner.payout.toFixed(2)} — executor picking route…`,
+        });
       } else {
         const symbol = result.tokenSymbol || result.tokenMint?.slice(0, 4) || 'TOKEN';
+        // Fetch token logo in background — don't block UI
+        let logoUrl = '';
+        try {
+          logoUrl = await fetchTokenLogoViaJupiter(result.tokenMint || '');
+        } catch { /* non-critical */ }
         setDegenToken({
           mint: result.tokenMint || '',
           symbol,
+          logoUrl,
         });
         setDegenStatus(`Claimed as ${symbol}.`);
+        pushNotification({
+          type: 'win',
+          title: `Degen Claim — ${symbol}`,
+          detail: `$${winner.payout.toFixed(2)} swapped to ${symbol}`,
+        });
       }
     } catch (e: any) {
       setDegenStatus(`Error: ${e.message?.slice(0, 80)}`);
@@ -230,8 +254,20 @@ export function WinnerModal({
                 </p>
                 {degenToken ? (
                   <>
-                    <div className="flex items-center justify-center gap-2">
-                      <span className="text-lg font-black text-slate-900 dark:text-white">{degenToken.symbol}</span>
+                    <div className="flex items-center justify-center gap-3 py-2">
+                      {degenToken.logoUrl ? (
+                        <img
+                          src={degenToken.logoUrl}
+                          alt={degenToken.symbol}
+                          className="w-10 h-10 rounded-full ring-2 ring-purple-400/30 shadow-lg"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white text-sm font-black shadow-lg">
+                          {degenToken.symbol.slice(0, 2)}
+                        </div>
+                      )}
+                      <span className="text-2xl font-black text-slate-900 dark:text-white">{degenToken.symbol}</span>
                     </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-mono break-all">
                       {degenToken.mint}

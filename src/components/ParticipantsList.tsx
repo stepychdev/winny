@@ -79,27 +79,31 @@ export function ParticipantsList({ participants, totalUsdc }: ParticipantsListPr
                     )}
                   </div>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    {p.tokens.map((t, j) =>
-                      t.icon ? (
-                        <img
-                          key={j}
-                          src={t.icon}
-                          alt={t.symbol}
-                          className="w-3.5 h-3.5 rounded-full"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <span
-                          key={j}
-                          className="w-3.5 h-3.5 rounded-full bg-slate-200 dark:bg-slate-600 flex items-center justify-center text-[6px] font-bold text-slate-500 dark:text-slate-300"
-                          title={t.symbol}
-                        >
-                          {t.symbol.slice(0, 1)}
+                    {p.tokens.map((t, j) => (
+                      <span key={j} className="inline-flex items-center gap-0.5">
+                        {t.icon ? (
+                          <img
+                            src={t.icon}
+                            alt={t.symbol}
+                            className="w-3.5 h-3.5 rounded-full"
+                            loading="lazy"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <span
+                            className="w-3.5 h-3.5 rounded-full bg-slate-200 dark:bg-slate-600 flex items-center justify-center text-[6px] font-bold text-slate-500 dark:text-slate-300"
+                            title={t.symbol}
+                          >
+                            {t.symbol.slice(0, 1)}
+                          </span>
+                        )}
+                        <span className="text-[9px] font-semibold text-slate-500 dark:text-slate-400">
+                          {t.symbol}
                         </span>
-                      )
-                    )}
+                      </span>
+                    ))}
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                       {shortenAddress(p.address)}
                     </span>
