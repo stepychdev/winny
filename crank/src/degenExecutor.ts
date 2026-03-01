@@ -60,6 +60,7 @@ const FALLBACK_PRIORITY_FEE = Number(process.env.CRANK_PRIORITY_FEE_MICROLAMPORT
 const DEFAULT_TIMEOUT_MS = 10_000;
 const ONE_SHOT = process.argv.includes("--once");
 const MAX_TX_RAW_BYTES = 1232;
+const JACKPOT_ALT_ADDRESS = (process.env.JACKPOT_ALT || "").trim();
 
 const QUOTE_MAX_ACCOUNTS_SEQUENCE = parseMaxAccountsSequence(
   process.env.DEGEN_EXECUTOR_MAX_ACCOUNTS_SEQUENCE
@@ -233,6 +234,7 @@ async function buildExecutionTx(
   maxAccounts?: number,
   onlyDirectRoutes?: boolean,
   slippageBps?: number,
+  jackpotAlt?: AddressLookupTableAccount | null,
 ): Promise<VersionedTransaction> {
   const winner = claim.account.winner;
   const selectedMint = new PublicKey(candidate.mint);
@@ -358,12 +360,14 @@ async function buildExecutionTx(
   }
 
   allIxs.push(finalizeIx);
+  // Merge Jackpot ALT (our stable accounts) with Jupiter ALTs
+  const mergedAlts = jackpotAlt ? [jackpotAlt, ...alts] : alts;
   const { blockhash } = await connection.getLatestBlockhash("confirmed");
   const msg = new TransactionMessage({
     payerKey: executor.publicKey,
     recentBlockhash: blockhash,
     instructions: allIxs,
-  }).compileToV0Message(alts);
+  }).compileToV0Message(mergedAlts);
   return new VersionedTransaction(msg);
 }
 
@@ -440,7 +444,12 @@ async function simulateAndSend(
   return sig;
 }
 
-async function processReadyClaim(connection: Connection, executor: Keypair, claim: DegenClaimAccount): Promise<void> {
+async function processReadyClaim(
+  connection: Connection,
+  executor: Keypair,
+  claim: DegenClaimAccount,
+  jackpotAlt?: AddressLookupTableAccount | null,
+): Promise<void> {
   const program = createProgram(connection, executor);
   const roundInfo = await connection.getAccountInfo(claim.account.round);
   if (!roundInfo) return;
@@ -507,6 +516,7 @@ async function processReadyClaim(connection: Connection, executor: Keypair, clai
             maxAccounts,
             false,
             slipBps,
+            jackpotAlt,
           );
           const sig = await simulateAndSend(connection, tx, executor);
           console.log(
@@ -699,13 +709,32 @@ async function main(): Promise<void> {
 
   console.log(`[degen-executor] executor=${executor.publicKey.toBase58()} poll_ms=${POLL_MS} one_shot=${ONE_SHOT}`);
 
+  // Load Jackpot ALT (optional — tx works without it but may be too large for complex routes)
+  let jackpotAlt: AddressLookupTableAccount | null = null;
+  if (JACKPOT_ALT_ADDRESS) {
+    try {
+      const altPubkey = new PublicKey(JACKPOT_ALT_ADDRESS);
+      const result = await connection.getAddressLookupTable(altPubkey);
+      if (result.value) {
+        jackpotAlt = result.value;
+        console.log(`[degen-executor] loaded Jackpot ALT: ${altPubkey.toBase58()} (${jackpotAlt.state.addresses.length} addresses)`);
+      } else {
+        console.warn(`[degen-executor] JACKPOT_ALT account not found: ${JACKPOT_ALT_ADDRESS}`);
+      }
+    } catch (err) {
+      console.warn(`[degen-executor] failed to load JACKPOT_ALT: ${err instanceof Error ? err.message : err}`);
+    }
+  } else {
+    console.log("[degen-executor] JACKPOT_ALT not set — using static keys (larger tx size)");
+  }
+
   await ensureExecutorAta(connection, executor);
 
   do {
     try {
       const claims = await fetchReadyClaims(program);
       for (const claim of claims) {
-        await processReadyClaim(connection, executor, claim);
+        await processReadyClaim(connection, executor, claim, jackpotAlt);
       }
     } catch (error) {
       console.error("[degen-executor] loop failed:", error);

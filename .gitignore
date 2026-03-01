@@ -118,3 +118,11 @@ squads_mainnet_out.json
 .env.devnet
 jackpot_pinocchio_poc/devnet-keys/
 crank/degen-executor-keypair.json
+
+# Executor / crank keypairs (NEVER commit private keys)
+crank/*-keypair.json
+crank/*keypair*.json
+**/degen-executor-keypair.json
+
+# Devnet test keypairs
+jackpot_pinocchio_poc/devnet-keys/*.json
