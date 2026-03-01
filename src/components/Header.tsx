@@ -64,7 +64,7 @@ export function Header() {
           onClick={() => navigate('game')}
         >
           <img src="/metadata/w_logo.svg" alt="Winny" className="size-10 rounded-full" />
-          <h2 className="text-slate-900 dark:text-white text-xl font-bold tracking-tight">Winny</h2>
+          <img src="/metadata/winny_text.png" alt="Winny" className="h-8 object-contain" />
         </div>
 
         {/* Desktop Nav — pill tabs */}
