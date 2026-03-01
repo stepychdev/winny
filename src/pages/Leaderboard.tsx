@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
-import { Trophy, Zap, CheckCircle, Loader2 } from 'lucide-react';
+import { Trophy, Zap, CheckCircle, Loader2, Gift, ExternalLink } from 'lucide-react';
 import { Header } from '../components/Header';
 import { SoarLeaderboard } from '../components/SoarLeaderboard';
-import { ENABLE_SOAR_LEADERBOARD } from '../lib/constants';
+import { ENABLE_SOAR_LEADERBOARD, TREASURY_USDC_ATA, SOLSCAN_CLUSTER_QUERY } from '../lib/constants';
 import { ensureSoarPlayerInitialized, checkSoarPlayerStatus } from '../lib/soar';
 
 export function Leaderboard() {
@@ -111,6 +111,36 @@ export function Leaderboard() {
         )}
 
         <SoarLeaderboard />
+
+        {/* Rewards info */}
+        {ENABLE_SOAR_LEADERBOARD && (
+          <div className="bento-card p-5 sm:p-6 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/15 dark:to-orange-900/15 border border-amber-200/60 dark:border-amber-800/40">
+            <div className="flex items-start gap-3">
+              <div className="size-9 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shadow-sm flex-shrink-0 mt-0.5">
+                <Gift className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-slate-900 dark:text-white text-base mb-1">Leaderboard Rewards</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-2">
+                  Top players on the volume leaderboard will receive periodic <span className="font-semibold text-amber-700 dark:text-amber-300">USDC airdrops</span> directly
+                  from the protocol treasury. The higher your rank — the bigger your share.
+                </p>
+                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
+                  All rewards are distributed from the on-chain treasury — fully transparent and verifiable.
+                </p>
+                <a
+                  href={`https://solscan.io/account/${TREASURY_USDC_ATA.toBase58()}${SOLSCAN_CLUSTER_QUERY}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-300 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  View Treasury on Solscan
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
