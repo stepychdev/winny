@@ -64,7 +64,7 @@ export function Header() {
           onClick={() => navigate('game')}
         >
           <img src="/metadata/w_logo.svg" alt="Winny" className="size-10 rounded-full" />
-          <h2 className="text-3xl text-white select-none" style={{ fontFamily: "'Fruktur', system-ui" }}>
+          <h2 className="text-3xl text-primary dark:text-white select-none" style={{ fontFamily: "'Fruktur', system-ui" }}>
             Winny
           </h2>
         </div>
