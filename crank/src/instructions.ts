@@ -192,19 +192,11 @@ export async function buildAutoClaimDegenFallback(
   payer: PublicKey,
   winner: PublicKey,
   roundId: number,
-  fallbackReason: number,
-  vrfPayer?: PublicKey
+  fallbackReason: number
 ): Promise<TransactionInstruction> {
   const roundPda = getRoundPda(roundId);
   const vaultAta = await getAssociatedTokenAddress(USDC_MINT, roundPda, true);
   const winnerAta = await getAssociatedTokenAddress(USDC_MINT, winner);
-
-  let vrfPayerAuthority: PublicKey | null = null;
-  let vrfPayerUsdcAta: PublicKey | null = null;
-  if (vrfPayer && !vrfPayer.equals(PublicKey.default)) {
-    vrfPayerAuthority = vrfPayer;
-    vrfPayerUsdcAta = await getAssociatedTokenAddress(USDC_MINT, vrfPayer);
-  }
 
   return await (program.methods as any)
     .autoClaimDegenFallback(new BN(roundId), fallbackReason)
@@ -216,8 +208,6 @@ export async function buildAutoClaimDegenFallback(
       vaultUsdcAta: vaultAta,
       winnerUsdcAta: winnerAta,
       treasuryUsdcAta: TREASURY_USDC_ATA,
-      vrfPayerAuthority: vrfPayerAuthority as any,
-      vrfPayerUsdcAta: vrfPayerUsdcAta as any,
       tokenProgram: TOKEN_PROGRAM_ID,
     })
     .instruction();
@@ -328,19 +318,11 @@ export async function buildBeginDegenExecution(
   minOutRaw: BN,
   routeHash: number[],
   selectedTokenMint: PublicKey,
-  receiverTokenAta: PublicKey,
-  vrfPayer?: PublicKey
+  receiverTokenAta: PublicKey
 ): Promise<TransactionInstruction> {
   const roundPda = getRoundPda(roundId);
   const vaultAta = await getAssociatedTokenAddress(USDC_MINT, roundPda, true);
   const executorAta = await getAssociatedTokenAddress(USDC_MINT, executor);
-
-  let vrfPayerAuthority: PublicKey | null = null;
-  let vrfPayerUsdcAta: PublicKey | null = null;
-  if (vrfPayer && !vrfPayer.equals(PublicKey.default)) {
-    vrfPayerAuthority = vrfPayer;
-    vrfPayerUsdcAta = await getAssociatedTokenAddress(USDC_MINT, vrfPayer);
-  }
 
   return await (program.methods as any)
     .beginDegenExecution(
@@ -359,8 +341,6 @@ export async function buildBeginDegenExecution(
       vaultUsdcAta: vaultAta,
       executorUsdcAta: executorAta,
       treasuryUsdcAta: TREASURY_USDC_ATA,
-      vrfPayerAuthority: vrfPayerAuthority as any,
-      vrfPayerUsdcAta: vrfPayerUsdcAta as any,
       selectedTokenMint,
       receiverTokenAta,
       tokenProgram: TOKEN_PROGRAM_ID,
@@ -386,6 +366,7 @@ export async function buildFinalizeDegenSuccess(
       degenClaim: getDegenClaimPda(roundId, winner),
       executorUsdcAta: executorAta,
       receiverTokenAta,
+      tokenProgram: TOKEN_PROGRAM_ID,
     })
     .instruction();
 }

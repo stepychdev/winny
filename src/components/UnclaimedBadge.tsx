@@ -6,18 +6,19 @@ interface UnclaimedBadgeProps {
   prize: UnclaimedPrize;
   loading: boolean;
   onClaim: (roundId: number) => Promise<string>;
+  onClaimDegen: (roundId: number) => Promise<unknown>;
 }
 
-export function UnclaimedBadge({ prize, loading, onClaim }: UnclaimedBadgeProps) {
+export function UnclaimedBadge({ prize, loading, onClaim, onClaimDegen }: UnclaimedBadgeProps) {
   const [dismissed, setDismissed] = useState(false);
-  const [claiming, setClaiming] = useState(false);
+  const [claimingMode, setClaimingMode] = useState<"usdc" | "degen" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   if (dismissed || success) return null;
 
   const handleClaim = async () => {
-    setClaiming(true);
+    setClaimingMode("usdc");
     setError(null);
     try {
       await onClaim(prize.roundId);
@@ -25,7 +26,20 @@ export function UnclaimedBadge({ prize, loading, onClaim }: UnclaimedBadgeProps)
     } catch (e: any) {
       setError(e.message?.slice(0, 50) || 'Claim failed');
     } finally {
-      setClaiming(false);
+      setClaimingMode(null);
+    }
+  };
+
+  const handleClaimDegen = async () => {
+    setClaimingMode("degen");
+    setError(null);
+    try {
+      await onClaimDegen(prize.roundId);
+      setSuccess(true);
+    } catch (e: any) {
+      setError(e.message?.slice(0, 50) || 'Degen claim failed');
+    } finally {
+      setClaimingMode(null);
     }
   };
 
@@ -54,18 +68,23 @@ export function UnclaimedBadge({ prize, loading, onClaim }: UnclaimedBadgeProps)
             </div>
           </div>
 
-          {/* Claim Button */}
-          <button
-            onClick={handleClaim}
-            disabled={claiming || loading}
-            className="flex h-9 min-w-[70px] cursor-pointer items-center justify-center rounded-full bg-primary px-4 text-sm font-bold text-white transition-all hover:bg-primary/90 hover:scale-105 active:scale-95 shadow-md shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-          >
-            {claiming ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              'Claim'
-            )}
-          </button>
+          {/* Claim Buttons */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleClaim}
+              disabled={claimingMode !== null || loading}
+              className="flex h-9 min-w-[70px] cursor-pointer items-center justify-center rounded-full bg-primary px-4 text-sm font-bold text-white transition-all hover:bg-primary/90 hover:scale-105 active:scale-95 shadow-md shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            >
+              {claimingMode === "usdc" ? <Loader2 className="w-4 h-4 animate-spin" /> : "USDC"}
+            </button>
+            <button
+              onClick={handleClaimDegen}
+              disabled={claimingMode !== null || loading}
+              className="flex h-9 min-w-[70px] cursor-pointer items-center justify-center rounded-full bg-violet-600 px-4 text-sm font-bold text-white transition-all hover:bg-violet-500 hover:scale-105 active:scale-95 shadow-md shadow-violet-500/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            >
+              {claimingMode === "degen" ? <Loader2 className="w-4 h-4 animate-spin" /> : "DEGEN"}
+            </button>
+          </div>
 
           {/* Close Button (circle, top-right) */}
           <button

@@ -119,6 +119,8 @@ let cleanupLastStats: Map<number, ParticipantCleanupStats & { updatedAt: number 
 let roundObservedState: Map<number, { status: number; sinceTs: number; lastSeenTs: number }> = new Map();
 let stuckWarnedAt: Map<string, number> = new Map(); // key: `${roundId}:${status}`
 let lastHealthLogAt = 0;
+let lastVrfSentAt = 0; // unix ts — cooldown guard to prevent duplicate VRF requests
+const VRF_COOLDOWN_SEC = Number(process.env.VRF_COOLDOWN_SEC) || 15;
 
 // ─── Helpers ────────────────────────────────────────────────
 
@@ -501,6 +503,7 @@ async function handleLockAndVrf(
     const vrfIx = await buildRequestVrf(program, payer.publicKey, roundId);
     const sig = await signAndSend(connection, [lockIx, vrfIx], payer);
     lastLockedRound = roundId; // set ONLY after success
+    lastVrfSentAt = now();
     log(`✓ Round #${roundId} locked + VRF requested (${sig.slice(0, 16)}...)`);
     return true;
   } catch (e: any) {
@@ -540,10 +543,17 @@ async function handleRequestVrf(
   const fresh = await fetchRound(connection, roundId);
   if (!fresh || fresh.status !== RoundStatus.Locked) return false;
 
+  // Cooldown guard: skip if VRF was recently sent (prevents duplicate VRF spam)
+  const elapsed = now() - lastVrfSentAt;
+  if (elapsed < VRF_COOLDOWN_SEC) {
+    return false;
+  }
+
   try {
-    log(`Requesting VRF for round #${roundId}...`);
+    log(`Requesting VRF for round #${roundId} (standalone, ${elapsed}s since last VRF)...`);
     const ix = await buildRequestVrf(program, payer.publicKey, roundId);
     const sig = await signAndSend(connection, [ix], payer);
+    lastVrfSentAt = now();
     log(`✓ VRF requested for round #${roundId} (${sig.slice(0, 16)}...)`);
     return true;
   } catch (e: any) {
@@ -790,6 +800,7 @@ async function tick(
       const prevRound = currentRoundId;
       currentRoundId++;
       lastLockedRound = 0;
+      lastVrfSentAt = 0;
       log(`→ Round #${prevRound} settled — advanced to round #${currentRoundId} (claim/cleanup in background)`);
       maybeLogHealthSnapshot();
       return;
@@ -801,6 +812,7 @@ async function tick(
       const prevRound = currentRoundId;
       currentRoundId++;
       lastLockedRound = 0;
+      lastVrfSentAt = 0;
       log(`→ Round #${prevRound} done — advanced to round #${currentRoundId} (cleanup in background)`);
       maybeLogHealthSnapshot();
       return;

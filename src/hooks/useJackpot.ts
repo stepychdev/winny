@@ -227,6 +227,13 @@ export interface JackpotState {
     fallback: boolean;
   }>;
   claimUnclaimed: (roundId: number) => Promise<string>;
+  claimUnclaimedDegen: (roundId: number) => Promise<{
+    claimSig: string;
+    tokenMint: string | null;
+    tokenIndex: number | null;
+    tokenSymbol: string | null;
+    fallback: boolean;
+  }>;
   cancelRound: () => Promise<string>;
   claimRefund: () => Promise<string>;
   countdownStarted: boolean;
@@ -1150,7 +1157,7 @@ export function useJackpot(): JackpotState {
           const cache = depositTokensCacheRef.current;
           if (cache.roundId !== roundId) {
             depositTokensCacheRef.current = {
-              roundId, map: new Map(), processedSigs: new Set(), resolving: false,
+              roundId, map: new Map(), processedSigs: new Set(), resolving: false, lastResolveTs: 0,
             };
           }
           const nonUsdcMints = normalized
@@ -1454,6 +1461,108 @@ export function useJackpot(): JackpotState {
     }
   }, [program, publicKey, connection, sendTransaction, pollBalance, roundId, pollRound]);
 
+  const claimUnclaimedDegen = useCallback(
+    async (unclaimedRoundId: number): Promise<{
+      claimSig: string;
+      tokenMint: string | null;
+      tokenIndex: number | null;
+      tokenSymbol: string | null;
+      fallback: boolean;
+    }> => {
+      if (!publicKey) throw new Error("Wallet not connected");
+      setLoading(true);
+      setError(null);
+      try {
+        const oldRoundData = await fetchRound(connection, unclaimedRoundId);
+        if (!oldRoundData) {
+          throw new Error("Round no longer exists on-chain");
+        }
+        if (oldRoundData.status === RoundStatus.Claimed) {
+          clearUnclaimedPrize(unclaimedRoundId);
+          setUnclaimedPrizes((prev) => prev.filter((p) => p.roundId !== unclaimedRoundId));
+          throw new Error("Prize already claimed");
+        }
+        if (oldRoundData.status !== RoundStatus.Settled) {
+          throw new Error("Round is not in a claimable state");
+        }
+
+        const current = await fetchDegenClaim(program, unclaimedRoundId, publicKey);
+        let requestSig = "";
+
+        if (!current || current.status === 0 || current.status === DegenModeStatus.None) {
+          const reqTx = new Transaction();
+          const reqIx = await buildRequestDegenVrf(program, publicKey, unclaimedRoundId);
+          reqTx.add(reqIx);
+          requestSig = await sendTransaction(reqTx, connection, { skipPreflight: true });
+          await sleep(2000);
+        }
+
+        const degen = await fetchDegenClaim(program, unclaimedRoundId, publicKey);
+        if (!degen) {
+          throw new Error("Degen VRF request was sent, but claim state is not available yet.");
+        }
+
+        const clearUnclaimedIfDone = () => {
+          clearUnclaimedPrize(unclaimedRoundId);
+          setUnclaimedPrizes((prev) => prev.filter((p) => p.roundId !== unclaimedRoundId));
+        };
+
+        await pollRound();
+        await pollBalance();
+
+        if (degen.status === DegenModeStatus.ClaimedFallback) {
+          clearUnclaimedIfDone();
+          return {
+            claimSig: requestSig,
+            tokenMint: null,
+            tokenIndex: null,
+            tokenSymbol: null,
+            fallback: true,
+          };
+        }
+
+        if (degen.status === DegenModeStatus.ClaimedSwapped) {
+          clearUnclaimedIfDone();
+          const tokenMint = degen.tokenMint.equals(PublicKey.default)
+            ? null
+            : degen.tokenMint.toBase58();
+          const tokenSymbol = tokenMint
+            ? (await fetchDegenTokenMeta(tokenMint)).symbol
+            : null;
+          return {
+            claimSig: requestSig,
+            tokenMint,
+            tokenIndex: Number.isFinite(degen.tokenIndex) ? degen.tokenIndex : null,
+            tokenSymbol,
+            fallback: false,
+          };
+        }
+
+        if (
+          degen.status === DegenModeStatus.VrfRequested ||
+          degen.status === DegenModeStatus.VrfReady ||
+          degen.status === DegenModeStatus.Executing
+        ) {
+          return {
+            claimSig: requestSig,
+            tokenMint: null,
+            tokenIndex: null,
+            tokenSymbol: null,
+            fallback: false,
+          };
+        }
+
+        throw new Error("Unexpected degen claim state");
+      } catch (e: any) {
+        setError(e.message);
+        throw e;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [program, publicKey, connection, sendTransaction, pollRound, pollBalance]
+  );
+
   const cancelRound = useCallback(async (): Promise<string> => {
     if (!publicKey) throw new Error("Wallet not connected");
     setLoading(true);
@@ -1537,6 +1646,7 @@ export function useJackpot(): JackpotState {
     claim,
     claimDegen,
     claimUnclaimed,
+    claimUnclaimedDegen,
     cancelRound,
     claimRefund,
     countdownStarted: roundData ? Number(roundData.endTs) > 0 : false,

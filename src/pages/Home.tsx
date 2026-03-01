@@ -206,6 +206,7 @@ export function Home() {
               prize={prize}
               loading={jackpot.loading}
               onClaim={jackpot.claimUnclaimed}
+              onClaimDegen={jackpot.claimUnclaimedDegen}
             />
           ))}
         </div>

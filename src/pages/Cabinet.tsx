@@ -13,14 +13,14 @@ import { SoarLeaderboard } from '../components/SoarLeaderboard';
 
 export function Cabinet() {
   const { publicKey } = useWallet();
-  const { roundId, participants, unclaimedPrizes, claimUnclaimed } = useJackpot();
+  const { roundId, participants, unclaimedPrizes, claimUnclaimed, claimUnclaimedDegen } = useJackpot();
   const { transactions, totalDeposited, totalWon, roundCount, winCount } = useUserPnL();
-  const [claiming, setClaiming] = useState(false);
+  const [claimingMode, setClaimingMode] = useState<'usdc' | 'degen' | null>(null);
   const [claimStatus, setClaimStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
-  const handleClaim = async () => {
-    if (claiming || !unclaimedPrizes || unclaimedPrizes.length === 0) return;
-    setClaiming(true);
+  const handleClaimUsdc = async () => {
+    if (claimingMode || !unclaimedPrizes || unclaimedPrizes.length === 0) return;
+    setClaimingMode('usdc');
     try {
       // Claim each unclaimed prize
       for (const prize of unclaimedPrizes) {
@@ -33,7 +33,25 @@ export function Cabinet() {
       setClaimStatus('error');
       setTimeout(() => setClaimStatus('idle'), 3000);
     } finally {
-      setClaiming(false);
+      setClaimingMode(null);
+    }
+  };
+
+  const handleClaimDegen = async () => {
+    if (claimingMode || !unclaimedPrizes || unclaimedPrizes.length === 0) return;
+    setClaimingMode('degen');
+    try {
+      for (const prize of unclaimedPrizes) {
+        await claimUnclaimedDegen(prize.roundId);
+      }
+      setClaimStatus('success');
+      setTimeout(() => setClaimStatus('idle'), 3000);
+    } catch (e) {
+      console.error('Degen claim failed:', e);
+      setClaimStatus('error');
+      setTimeout(() => setClaimStatus('idle'), 3000);
+    } finally {
+      setClaimingMode(null);
     }
   };
 
@@ -88,19 +106,34 @@ export function Cabinet() {
             <p className="text-3xl font-bold text-accent mb-4">
               ${unclaimedPrizes?.reduce((sum, prize) => sum + prize.payout, 0).toFixed(2) || '0.00'}
             </p>
-            <button
-              onClick={handleClaim}
-              disabled={claiming || (unclaimedPrizes?.length || 0) === 0}
-              className={`w-full px-4 py-3 rounded-lg font-medium transition ${
-                claiming
-                  ? 'bg-accent/50 text-white cursor-wait'
-                  : (unclaimedPrizes?.length || 0) === 0
-                  ? 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed'
-                  : 'bg-accent text-white hover:opacity-90'
-              }`}
-            >
-              {claiming ? 'Claiming...' : 'Claim Now'}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleClaimUsdc}
+                disabled={claimingMode !== null || (unclaimedPrizes?.length || 0) === 0}
+                className={`flex-1 px-4 py-3 rounded-lg font-medium transition ${
+                  claimingMode === 'usdc'
+                    ? 'bg-accent/50 text-white cursor-wait'
+                    : (unclaimedPrizes?.length || 0) === 0
+                    ? 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed'
+                    : 'bg-accent text-white hover:opacity-90'
+                }`}
+              >
+                {claimingMode === 'usdc' ? 'Claiming...' : 'Claim USDC'}
+              </button>
+              <button
+                onClick={handleClaimDegen}
+                disabled={claimingMode !== null || (unclaimedPrizes?.length || 0) === 0}
+                className={`flex-1 px-4 py-3 rounded-lg font-medium transition ${
+                  claimingMode === 'degen'
+                    ? 'bg-violet-500 text-white cursor-wait'
+                    : (unclaimedPrizes?.length || 0) === 0
+                    ? 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed'
+                    : 'bg-violet-600 text-white hover:opacity-90'
+                }`}
+              >
+                {claimingMode === 'degen' ? 'Claiming...' : 'Claim DEGEN'}
+              </button>
+            </div>
             {claimStatus === 'success' && (
               <p className="mt-2 text-sm text-green-600 flex items-center gap-1">
                 <AlertCircle size={14} /> Successfully claimed!

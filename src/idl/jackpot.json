@@ -75,7 +75,7 @@
     {
       "name": "auto_claim",
       "docs": [
-        "Anyone can trigger claim — funds go to the on-chain winner."
+        "Anyone can trigger claim \u2014 funds go to the on-chain winner."
       ],
       "discriminator": [
         184,
@@ -140,7 +140,7 @@
         {
           "name": "winner_usdc_ata",
           "docs": [
-            "Winner's USDC ATA — validated in handler against round.winner."
+            "Winner's USDC ATA \u2014 validated in handler against round.winner."
           ],
           "writable": true
         },
@@ -290,16 +290,6 @@
           "writable": true
         },
         {
-          "name": "vrf_payer_authority",
-          "writable": true,
-          "optional": true
-        },
-        {
-          "name": "vrf_payer_usdc_ata",
-          "writable": true,
-          "optional": true
-        },
-        {
           "name": "selected_token_mint"
         },
         {
@@ -342,7 +332,7 @@
     {
       "name": "cancel_round",
       "docs": [
-        "Cancel participation — refund USDC from vault while round is still Open."
+        "Cancel participation \u2014 refund USDC from vault while round is still Open."
       ],
       "discriminator": [
         82,
@@ -500,7 +490,7 @@
         {
           "name": "vault_usdc_ata",
           "docs": [
-            "Vault USDC ATA owned by the round PDA — verified in handler."
+            "Vault USDC ATA owned by the round PDA \u2014 verified in handler."
           ],
           "writable": true
         },
@@ -632,16 +622,6 @@
           "writable": true
         },
         {
-          "name": "vrf_payer_authority",
-          "writable": true,
-          "optional": true
-        },
-        {
-          "name": "vrf_payer_usdc_ata",
-          "writable": true,
-          "optional": true
-        },
-        {
           "name": "token_program",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         }
@@ -660,7 +640,7 @@
     {
       "name": "auto_claim_degen_fallback",
       "docs": [
-        "Anyone can trigger degen fallback claim — funds go to the on-chain winner."
+        "Anyone can trigger degen fallback claim \u2014 funds go to the on-chain winner."
       ],
       "discriminator": [
         124,
@@ -759,16 +739,6 @@
         {
           "name": "treasury_usdc_ata",
           "writable": true
-        },
-        {
-          "name": "vrf_payer_authority",
-          "writable": true,
-          "optional": true
-        },
-        {
-          "name": "vrf_payer_usdc_ata",
-          "writable": true,
-          "optional": true
         },
         {
           "name": "token_program",
@@ -922,7 +892,7 @@
         {
           "name": "user",
           "docs": [
-            "The participant's wallet — receives the rent lamports."
+            "The participant's wallet \u2014 receives the rent lamports."
           ],
           "writable": true
         },
@@ -1033,7 +1003,7 @@
         {
           "name": "vault_usdc_ata",
           "docs": [
-            "Vault USDC ATA owned by the round PDA — must be empty."
+            "Vault USDC ATA owned by the round PDA \u2014 must be empty."
           ],
           "writable": true
         },
@@ -1341,6 +1311,10 @@
         {
           "name": "receiver_token_ata",
           "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         }
       ],
       "args": [
@@ -2083,7 +2057,7 @@
         {
           "name": "vrf_program_identity",
           "docs": [
-            "VRF program identity PDA — only the VRF program can produce this signature."
+            "VRF program identity PDA \u2014 only the VRF program can produce this signature."
           ],
           "signer": true,
           "address": "9irBy75QS2BN81FUgXuHcjqceJJRuc9oDkAe8TKVvvAw"
@@ -2106,7 +2080,7 @@
         {
           "name": "round",
           "docs": [
-            "No seeds constraint — round_id not available from VRF callback args.",
+            "No seeds constraint \u2014 round_id not available from VRF callback args.",
             "PDA verified manually in handler."
           ],
           "writable": true
@@ -2536,12 +2510,12 @@
     {
       "code": 6026,
       "name": "VaultNotEmpty",
-      "msg": "Vault still has tokens — cannot close"
+      "msg": "Vault still has tokens \u2014 cannot close"
     },
     {
       "code": 6027,
       "name": "RoundExpired",
-      "msg": "Round timer has expired — no more deposits accepted"
+      "msg": "Round timer has expired \u2014 no more deposits accepted"
     },
     {
       "code": 6028,
@@ -2571,7 +2545,7 @@
     {
       "code": 6033,
       "name": "CancelNotAllowed",
-      "msg": "Cannot cancel — other participants have deposits in this round"
+      "msg": "Cannot cancel \u2014 other participants have deposits in this round"
     },
     {
       "code": 6034,
@@ -3316,7 +3290,7 @@
     {
       "name": "Round",
       "docs": [
-        "Round account — zero-copy to avoid stack overflow (~21KB).",
+        "Round account \u2014 zero-copy to avoid stack overflow (~21KB).",
         "All instructions must use `AccountLoader<'info, Round>` and call `.load()` / `.load_mut()`."
       ],
       "serialization": "bytemuck",

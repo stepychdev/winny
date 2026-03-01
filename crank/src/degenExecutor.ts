@@ -2,6 +2,7 @@ import fs from "fs";
 import { createHash } from "crypto";
 import {
   AddressLookupTableAccount,
+  ComputeBudgetProgram,
   Connection,
   Keypair,
   PublicKey,
@@ -14,12 +15,16 @@ import {
   createTransferInstruction,
   getAssociatedTokenAddress,
   TOKEN_PROGRAM_ID,
+  TOKEN_2022_PROGRAM_ID,
 } from "@solana/spl-token";
 import BN from "bn.js";
 import {
   DegenClaimStatus,
+  getConfigPda,
+  getDegenClaimPda,
   PROGRAM_ID,
   RoundStatus,
+  TREASURY_USDC_ATA,
   USDC_MINT,
 } from "./constants.js";
 import {
@@ -29,19 +34,37 @@ import {
   createProgram,
 } from "./instructions.js";
 import { DEGEN_POOL, DEGEN_POOL_VERSION } from "./generated/degenPool.js";
-
-const DISC = 8;
-const ROUND_STATUS_OFFSET = DISC + 8;
-const ROUND_VRF_PAYER_OFFSET = DISC + 8176;
-const ROUND_DEGEN_STATUS_OFFSET = DISC + 8209;
+import {
+  deriveCandidates,
+  isTxTooLargeError,
+  isSlippageError,
+  parseMaxAccountsSequence,
+  parseRoundMeta,
+  parseConfigFeeBps,
+  computeBeginDegenPayout,
+  routeHashFromQuote,
+  type JupiterQuote,
+} from "./degenLogic.js";
 
 const POLL_MS = Number(process.env.DEGEN_EXECUTOR_POLL_MS || 5000);
-const SLIPPAGE_BPS = Number(process.env.DEGEN_EXECUTOR_SLIPPAGE_BPS || 100);
+
+/** Escalating slippage sequence: start tight, widen on failure. Jupiter anti-MEV
+ *  means higher slippage doesn't worsen execution — only lowers the revert threshold. */
+const SLIPPAGE_SEQUENCE = (process.env.DEGEN_EXECUTOR_SLIPPAGE_SEQUENCE || "300,400,500,600")
+  .split(",").map(Number).filter(n => Number.isFinite(n) && n > 0);
 const JUPITER_API_BASE = "https://api.jup.ag";
 const JUPITER_API_KEY = (process.env.JUPITER_API_KEY || "").trim();
 const COMPUTE_BUDGET_PROGRAM = new PublicKey("ComputeBudget111111111111111111111111111111");
+const FALLBACK_CU_LIMIT = Number(process.env.CRANK_COMPUTE_UNIT_LIMIT || 600_000);
+const FALLBACK_PRIORITY_FEE = Number(process.env.CRANK_PRIORITY_FEE_MICROLAMPORTS || 20_000);
 const DEFAULT_TIMEOUT_MS = 10_000;
 const ONE_SHOT = process.argv.includes("--once");
+const MAX_TX_RAW_BYTES = 1232;
+
+const QUOTE_MAX_ACCOUNTS_SEQUENCE = parseMaxAccountsSequence(
+  process.env.DEGEN_EXECUTOR_MAX_ACCOUNTS_SEQUENCE
+);
+const mintOwnerCache = new Map<string, PublicKey | null>();
 
 interface DegenClaimAccount {
   publicKey: PublicKey;
@@ -57,16 +80,6 @@ interface DegenClaimAccount {
     payoutRaw: BN;
     fallbackAfterTs: BN;
   };
-}
-
-interface JupiterQuote {
-  inputMint: string;
-  outputMint: string;
-  inAmount: string;
-  outAmount: string;
-  otherAmountThreshold: string;
-  swapMode: "ExactIn" | "ExactOut";
-  routePlan: Array<unknown>;
 }
 
 interface SerializedInstruction {
@@ -103,60 +116,6 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function encodeU32LE(value: number): Uint8Array {
-  const out = new Uint8Array(4);
-  new DataView(out.buffer).setUint32(0, value, true);
-  return out;
-}
-
-function decodeU32LE(value: Uint8Array): number {
-  return new DataView(value.buffer, value.byteOffset, value.byteLength).getUint32(0, true);
-}
-
-async function sha256(parts: Uint8Array[]): Promise<Uint8Array> {
-  const total = parts.reduce((sum, part) => sum + part.length, 0);
-  const payload = new Uint8Array(total);
-  let offset = 0;
-  for (const part of parts) {
-    payload.set(part, offset);
-    offset += part.length;
-  }
-
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", payload);
-  return new Uint8Array(digest);
-}
-
-async function deriveCandidates(
-  randomness: Uint8Array,
-  poolVersion: number,
-  count: number,
-): Promise<Array<{ rank: number; index: number; mint: string }>> {
-  const limit = Math.min(count, DEGEN_POOL.length);
-  const used = new Set<number>();
-  const out: Array<{ rank: number; index: number; mint: string }> = [];
-
-  for (let rank = 0; rank < limit; rank += 1) {
-    let nonce = 0;
-    while (true) {
-      const digest = await sha256([
-        randomness,
-        encodeU32LE(poolVersion),
-        encodeU32LE(rank),
-        encodeU32LE(nonce),
-      ]);
-      const index = decodeU32LE(digest.subarray(0, 4)) % DEGEN_POOL.length;
-      if (!used.has(index)) {
-        used.add(index);
-        out.push({ rank, index, mint: DEGEN_POOL[index] });
-        break;
-      }
-      nonce += 1;
-    }
-  }
-
-  return out;
-}
-
 async function jupiterFetch<T>(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
   if (!JUPITER_API_KEY) throw new Error("Missing JUPITER_API_KEY");
   const controller = new AbortController();
@@ -180,15 +139,27 @@ async function jupiterFetch<T>(path: string, init?: RequestInit & { timeoutMs?: 
   }
 }
 
-async function getQuote(outputMint: string, amount: string): Promise<JupiterQuote> {
+async function getQuoteWithMaxAccounts(
+  outputMint: string,
+  amount: string,
+  maxAccounts?: number,
+  onlyDirectRoutes?: boolean,
+  slippageBps?: number,
+): Promise<JupiterQuote> {
   const params = new URLSearchParams({
     inputMint: USDC_MINT.toBase58(),
     outputMint,
     amount,
-    slippageBps: String(SLIPPAGE_BPS),
+    slippageBps: String(slippageBps ?? SLIPPAGE_SEQUENCE[0] ?? 300),
     swapMode: "ExactIn",
     restrictIntermediateTokens: "true",
   });
+  if (maxAccounts && Number.isFinite(maxAccounts)) {
+    params.set("maxAccounts", String(maxAccounts));
+  }
+  if (onlyDirectRoutes) {
+    params.set("onlyDirectRoutes", "true");
+  }
   return jupiterFetch<JupiterQuote>(`/swap/v1/quote?${params.toString()}`);
 }
 
@@ -207,6 +178,20 @@ async function getSwapInstructions(
       prioritizationFeeLamports: "auto",
     }),
   });
+}
+
+async function getMintOwner(
+  connection: Connection,
+  mint: PublicKey,
+): Promise<PublicKey | null> {
+  const key = mint.toBase58();
+  if (mintOwnerCache.has(key)) {
+    return mintOwnerCache.get(key) ?? null;
+  }
+  const info = await connection.getAccountInfo(mint, "confirmed");
+  const owner = info?.owner ?? null;
+  mintOwnerCache.set(key, owner);
+  return owner;
 }
 
 function deserializeInstruction(ix: SerializedInstruction): TransactionInstruction {
@@ -238,54 +223,64 @@ async function resolveLookupTables(
   });
 }
 
-function routeHashFromQuote(quote: JupiterQuote): number[] {
-  return Array.from(createHash("sha256").update(JSON.stringify(quote.routePlan)).digest());
-}
-
-function parseRoundMeta(data: Buffer): {
-  status: number;
-  degenModeStatus: number;
-  vrfPayer: PublicKey;
-} {
-  return {
-    status: data[ROUND_STATUS_OFFSET],
-    degenModeStatus: data[ROUND_DEGEN_STATUS_OFFSET],
-    vrfPayer: new PublicKey(data.subarray(ROUND_VRF_PAYER_OFFSET, ROUND_VRF_PAYER_OFFSET + 32)),
-  };
-}
-
 async function buildExecutionTx(
   connection: Connection,
   program: any,
   executor: Keypair,
   claim: DegenClaimAccount,
   candidate: { rank: number; index: number; mint: string },
-  vrfPayer: PublicKey,
   payoutRaw: bigint,
+  maxAccounts?: number,
+  onlyDirectRoutes?: boolean,
+  slippageBps?: number,
 ): Promise<VersionedTransaction> {
   const winner = claim.account.winner;
   const selectedMint = new PublicKey(candidate.mint);
-  const receiverAta = await getAssociatedTokenAddress(selectedMint, winner);
+  const selectedMintOwner = await getMintOwner(connection, selectedMint);
+  if (!selectedMintOwner) {
+    throw new Error(`selected mint account not found: ${selectedMint.toBase58()}`);
+  }
+  if (!selectedMintOwner.equals(TOKEN_PROGRAM_ID) && !selectedMintOwner.equals(TOKEN_2022_PROGRAM_ID)) {
+    throw new Error(
+      `unsupported selected mint program for v3 degen execution: ${selectedMint.toBase58()} owner=${selectedMintOwner.toBase58()}`
+    );
+  }
+  const receiverAta = await getAssociatedTokenAddress(selectedMint, winner, true, selectedMintOwner);
+  const executorUsdcAta = await getAssociatedTokenAddress(USDC_MINT, executor.publicKey);
+
+  // Drain executor ATA if it has a stale balance (prevents InvalidDegenExecutorAta / 6043)
+  // Executor ATA is created once at startup — no need to create it in every tx
+  const drainIxs: TransactionInstruction[] = [];
+  try {
+    const ataBalance = await connection.getTokenAccountBalance(executorUsdcAta, "confirmed");
+    const staleAmount = BigInt(ataBalance.value.amount);
+    if (staleAmount > 0n) {
+      console.warn(`[degen-executor] draining stale ${staleAmount} USDC lamports from executor ATA`);
+      drainIxs.push(
+        createTransferInstruction(
+          executorUsdcAta,
+          TREASURY_USDC_ATA,
+          executor.publicKey,
+          staleAmount,
+          [],
+          TOKEN_PROGRAM_ID,
+        ),
+      );
+    }
+  } catch {
+    // ATA doesn't exist — will be ensured at startup via ensureExecutorAta()
+  }
+
   const prefixIxs: TransactionInstruction[] = [
+    ...drainIxs,
     createAssociatedTokenAccountIdempotentInstruction(
       executor.publicKey,
       receiverAta,
       winner,
       selectedMint,
+      selectedMintOwner,
     ),
   ];
-
-  if (!vrfPayer.equals(PublicKey.default)) {
-    const vrfAta = await getAssociatedTokenAddress(USDC_MINT, vrfPayer);
-    prefixIxs.push(
-      createAssociatedTokenAccountIdempotentInstruction(
-        executor.publicKey,
-        vrfAta,
-        vrfPayer,
-        USDC_MINT,
-      )
-    );
-  }
 
   const routeHash = candidate.mint === USDC_MINT.toBase58()
     ? Array.from(createHash("sha256").update("direct-usdc").digest())
@@ -303,7 +298,6 @@ async function buildExecutionTx(
     routeHash ?? new Array(32).fill(0),
     selectedMint,
     receiverAta,
-    vrfPayer.equals(PublicKey.default) ? undefined : vrfPayer,
   );
   const finalizeIx = await buildFinalizeDegenSuccess(
     program,
@@ -329,7 +323,7 @@ async function buildExecutionTx(
       )
     );
   } else {
-    const quote = await getQuote(candidate.mint, payoutRaw.toString());
+    const quote = await getQuoteWithMaxAccounts(candidate.mint, payoutRaw.toString(), maxAccounts, onlyDirectRoutes, slippageBps);
     const swapIxs = await getSwapInstructions(
       executor.publicKey.toBase58(),
       quote,
@@ -353,11 +347,10 @@ async function buildExecutionTx(
         claim.account.roundId.toNumber(),
         candidate.rank,
         candidate.index,
-        new BN(quote.outAmount),
+        new BN(quote.otherAmountThreshold),
         routeHashFromQuote(quote),
         selectedMint,
         receiverAta,
-        vrfPayer.equals(PublicKey.default) ? undefined : vrfPayer,
       ),
       ...bodyIxs,
     ];
@@ -374,12 +367,42 @@ async function buildExecutionTx(
   return new VersionedTransaction(msg);
 }
 
+/** Error subclass to signal that the tx may have landed despite confirm timeout. */
+class TxTimeoutError extends Error {
+  readonly cause?: Error;
+  constructor(public readonly signature: string, cause?: Error) {
+    super(`tx timeout (may have landed): ${signature}`);
+    this.name = "TxTimeoutError";
+    if (cause) this.cause = cause;
+  }
+}
+
+function isConfirmTimeoutError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return (
+    msg.includes("was not confirmed in") ||
+    msg.includes("TransactionExpiredTimeoutError") ||
+    msg.includes("TransactionExpiredBlockheightExceededError")
+  );
+}
+
 async function simulateAndSend(
   connection: Connection,
   tx: VersionedTransaction,
   signer: Keypair,
 ): Promise<string> {
   tx.sign([signer]);
+  try {
+    const serialized = tx.serialize();
+    if (serialized.length > MAX_TX_RAW_BYTES) {
+      throw new Error(`transaction too large: ${serialized.length} bytes (max ${MAX_TX_RAW_BYTES})`);
+    }
+  } catch (error) {
+    if (isTxTooLargeError(error)) {
+      throw new Error(error instanceof Error ? error.message : String(error));
+    }
+    throw error;
+  }
   const simulation = await connection.simulateTransaction(tx, {
     sigVerify: false,
     commitment: "processed",
@@ -391,7 +414,29 @@ async function simulateAndSend(
     skipPreflight: true,
     maxRetries: 3,
   });
-  await connection.confirmTransaction(sig, "confirmed");
+  try {
+    await connection.confirmTransaction(sig, "confirmed");
+  } catch (confirmErr) {
+    if (isConfirmTimeoutError(confirmErr)) {
+      // Poll signature status a few times before giving up — the tx may have landed
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await new Promise((r) => setTimeout(r, 5_000));
+        const { value } = await connection.getSignatureStatuses([sig]);
+        const status = value?.[0];
+        if (status?.confirmationStatus === "confirmed" || status?.confirmationStatus === "finalized") {
+          if (!status.err) {
+            console.log(`[degen-executor] tx ${sig} confirmed after timeout (attempt ${attempt + 1})`);
+            return sig;
+          }
+          // Tx landed but failed on-chain — treat as real error
+          throw new Error(`tx landed with error: ${JSON.stringify(status.err)}`);
+        }
+      }
+      // Still unknown — throw TxTimeoutError so caller can check on-chain state
+      throw new TxTimeoutError(sig, confirmErr instanceof Error ? confirmErr : undefined);
+    }
+    throw confirmErr;
+  }
   return sig;
 }
 
@@ -407,6 +452,19 @@ async function processReadyClaim(connection: Connection, executor: Keypair, clai
     return;
   }
 
+  // Compute the actual payout that begin_degen_execution will transfer.
+  // The on-chain handler uses reimburse_vrf=false, so we must match that —
+  // NOT claim.account.payoutRaw which was set by VRF callback with reimburse_vrf=true.
+  const configInfo = await connection.getAccountInfo(getConfigPda());
+  if (!configInfo) { console.warn("[degen-executor] config account not found"); return; }
+  const feeBps = parseConfigFeeBps(configInfo.data);
+  const actualPayoutRaw = computeBeginDegenPayout(round.totalUsdc, feeBps);
+  if (actualPayoutRaw <= 0n) { console.warn("[degen-executor] computed payout is zero"); return; }
+  const vrfPayout = BigInt(claim.account.payoutRaw.toString());
+  if (actualPayoutRaw !== vrfPayout) {
+    console.log(`[degen-executor] round #${claim.account.roundId.toString()} payout correction: VRF=${vrfPayout} → actual=${actualPayoutRaw} (delta=${actualPayoutRaw - vrfPayout})`);
+  }
+
   const candidates = await deriveCandidates(
     claim.account.randomness,
     claim.account.poolVersion,
@@ -415,20 +473,139 @@ async function processReadyClaim(connection: Connection, executor: Keypair, clai
 
   for (const candidate of candidates) {
     try {
-      const tx = await buildExecutionTx(
-        connection,
-        program,
-        executor,
-        claim,
-        candidate,
-        round.vrfPayer,
-        BigInt(claim.account.payoutRaw.toString()),
-      );
-      const sig = await simulateAndSend(connection, tx, executor);
-      console.log(`[degen-executor] round #${claim.account.roundId.toString()} executed via rank=${candidate.rank} mint=${candidate.mint} sig=${sig}`);
-      return;
+      const directUsdc = candidate.mint === USDC_MINT.toBase58();
+
+      // Early filter: reject mints with unknown token program (before ATA creation or Jupiter calls)
+      if (!directUsdc) {
+        const selectedMint = new PublicKey(candidate.mint);
+        const mintOwner = await getMintOwner(connection, selectedMint);
+        if (!mintOwner || (!mintOwner.equals(TOKEN_PROGRAM_ID) && !mintOwner.equals(TOKEN_2022_PROGRAM_ID))) {
+          const ownerLabel = mintOwner?.toBase58() ?? "unknown";
+          throw new Error(`unsupported mint program: ${ownerLabel}`);
+        }
+      }
+
+      const maxAccountsAttempts = directUsdc ? [undefined] : QUOTE_MAX_ACCOUNTS_SEQUENCE.map((value) => value);
+      let lastSizedError: Error | null = null;
+      let lastSlippageError: Error | null = null;
+
+      // Outer loop: escalating slippage. Inner loop: shrinking maxAccounts.
+      const slippageSteps = directUsdc ? [undefined] : SLIPPAGE_SEQUENCE;
+
+      for (const slipBps of slippageSteps) {
+        lastSizedError = null;
+
+      for (const maxAccounts of maxAccountsAttempts) {
+        try {
+          const tx = await buildExecutionTx(
+            connection,
+            program,
+            executor,
+            claim,
+            candidate,
+            actualPayoutRaw,
+            maxAccounts,
+            false,
+            slipBps,
+          );
+          const sig = await simulateAndSend(connection, tx, executor);
+          console.log(
+            `[degen-executor] round #${claim.account.roundId.toString()} executed via rank=${candidate.rank} mint=${candidate.mint} sig=${sig}` +
+              (maxAccounts ? ` maxAccounts=${maxAccounts}` : "") +
+              (slipBps ? ` slippage=${slipBps}bps` : "")
+          );
+          return;
+        } catch (error) {
+          if (isTxTooLargeError(error) && !directUsdc) {
+            lastSizedError = error instanceof Error
+              ? new Error(`${error.message}${maxAccounts ? ` (maxAccounts=${maxAccounts})` : ""}`)
+              : new Error(String(error));
+            continue; // try smaller maxAccounts
+          }
+          // Slippage / output threshold error → try next slippage level
+          const msg = error instanceof Error ? error.message : String(error);
+          if (isSlippageError(msg)) {
+            lastSlippageError = error instanceof Error ? error : new Error(msg);
+            break; // break maxAccounts loop, try next slippage
+          }
+          throw error; // unexpected error → bubble up to candidate loop
+        }
+      }
+
+      // Last resort: try single-hop route with aggressive maxAccounts
+      if (lastSizedError && !directUsdc) {
+        try {
+          const tx = await buildExecutionTx(
+            connection,
+            program,
+            executor,
+            claim,
+            candidate,
+            actualPayoutRaw,
+            20,
+            true,
+            slipBps,
+          );
+          const sig = await simulateAndSend(connection, tx, executor);
+          console.log(
+            `[degen-executor] round #${claim.account.roundId.toString()} executed via rank=${candidate.rank} mint=${candidate.mint} sig=${sig} (directRoute)` +
+              (slipBps ? ` slippage=${slipBps}bps` : "")
+          );
+          return;
+        } catch (directError) {
+          if (isTxTooLargeError(directError)) {
+            lastSizedError = new Error(`${(directError as Error).message} (directRoute maxAccounts=20)`);
+          } else {
+            const msg = directError instanceof Error ? directError.message : String(directError);
+            if (isSlippageError(msg)) {
+              lastSlippageError = directError instanceof Error ? directError : new Error(msg);
+            } else {
+              throw directError;
+            }
+          }
+        }
+      }
+
+      // If it was a slippage error, continue to next slippage step
+      if (lastSlippageError) {
+        console.warn(
+          `[degen-executor] slippage ${slipBps ?? "default"}bps too tight for rank=${candidate.rank}, escalating...`
+        );
+        continue;
+      }
+
+      } // end slippage loop
+
+      if (lastSizedError) {
+        throw lastSizedError;
+      }
+      if (lastSlippageError) {
+        throw lastSlippageError;
+      }
     } catch (error) {
-      console.warn(`[degen-executor] candidate rank=${candidate.rank} failed for round #${claim.account.roundId.toString()}:`, error instanceof Error ? error.message : error);
+      const errMsg = error instanceof Error ? error.message : String(error);
+      console.warn(`[degen-executor] candidate rank=${candidate.rank} failed for round #${claim.account.roundId.toString()}:`, errMsg);
+
+      // After a timeout error, the tx may have landed and changed DegenClaim state.
+      // Check the on-chain claim status — if it moved past VrfReady, stop iterating.
+      if (error instanceof TxTimeoutError || isConfirmTimeoutError(error)) {
+        try {
+          const dcPda = getDegenClaimPda(claim.account.roundId.toNumber(), claim.account.winner);
+          const dcInfo = await connection.getAccountInfo(dcPda, "confirmed");
+          if (dcInfo) {
+            const DISC = 8;
+            const onChainStatus = dcInfo.data[DISC + 72];
+            if (onChainStatus >= DegenClaimStatus.Executing) {
+              console.log(
+                `[degen-executor] DegenClaim status is now ${onChainStatus} (>= Executing) — a previous tx likely landed, stopping candidate iteration`
+              );
+              return;
+            }
+          }
+        } catch (checkErr) {
+          console.warn("[degen-executor] failed to check DegenClaim status after timeout:", checkErr instanceof Error ? checkErr.message : checkErr);
+        }
+      }
     }
   }
 
@@ -440,7 +617,6 @@ async function processReadyClaim(connection: Connection, executor: Keypair, clai
     try {
       const fallbackReason = 3; // NO_ROUTES_FOUND / all candidates exhausted
       const winner = claim.account.winner;
-      const vrfPayer = round.vrfPayer.equals(PublicKey.default) ? undefined : round.vrfPayer;
 
       const winnerAta = await getAssociatedTokenAddress(USDC_MINT, winner);
       const createWinnerAtaIx = createAssociatedTokenAccountIdempotentInstruction(
@@ -450,18 +626,11 @@ async function processReadyClaim(connection: Connection, executor: Keypair, clai
         USDC_MINT,
       );
 
-      const prefixIxs: TransactionInstruction[] = [createWinnerAtaIx];
-      if (vrfPayer) {
-        const vrfAta = await getAssociatedTokenAddress(USDC_MINT, vrfPayer);
-        prefixIxs.push(
-          createAssociatedTokenAccountIdempotentInstruction(
-            executor.publicKey,
-            vrfAta,
-            vrfPayer,
-            USDC_MINT,
-          )
-        );
-      }
+      const prefixIxs: TransactionInstruction[] = [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: FALLBACK_CU_LIMIT }),
+        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: FALLBACK_PRIORITY_FEE }),
+        createWinnerAtaIx,
+      ];
 
       const fallbackIx = await buildAutoClaimDegenFallback(
         program,
@@ -469,7 +638,6 @@ async function processReadyClaim(connection: Connection, executor: Keypair, clai
         winner,
         claim.account.roundId.toNumber(),
         fallbackReason,
-        vrfPayer,
       );
 
       const { blockhash } = await connection.getLatestBlockhash("confirmed");
@@ -495,6 +663,34 @@ async function fetchReadyClaims(program: any): Promise<DegenClaimAccount[]> {
   return accounts.filter((entry: DegenClaimAccount) => entry.account.status === DegenClaimStatus.VrfReady);
 }
 
+async function ensureExecutorAta(connection: Connection, executor: Keypair): Promise<void> {
+  const executorUsdcAta = await getAssociatedTokenAddress(USDC_MINT, executor.publicKey);
+  const info = await connection.getAccountInfo(executorUsdcAta, "confirmed");
+  if (info) {
+    console.log(`[degen-executor] executor USDC ATA exists: ${executorUsdcAta.toBase58()}`);
+    return;
+  }
+  console.log(`[degen-executor] creating executor USDC ATA: ${executorUsdcAta.toBase58()}`);
+  const ix = createAssociatedTokenAccountIdempotentInstruction(
+    executor.publicKey,
+    executorUsdcAta,
+    executor.publicKey,
+    USDC_MINT,
+    TOKEN_PROGRAM_ID,
+  );
+  const { blockhash } = await connection.getLatestBlockhash("confirmed");
+  const msg = new TransactionMessage({
+    payerKey: executor.publicKey,
+    recentBlockhash: blockhash,
+    instructions: [ix],
+  }).compileToV0Message();
+  const tx = new VersionedTransaction(msg);
+  tx.sign([executor]);
+  const sig = await connection.sendTransaction(tx, { skipPreflight: false });
+  await connection.confirmTransaction(sig, "confirmed");
+  console.log(`[degen-executor] executor USDC ATA created: ${sig}`);
+}
+
 async function main(): Promise<void> {
   const rpcUrl = envRequired("RPC_URL");
   const executor = loadKeypair(envRequired("DEGEN_EXECUTOR_KEYPAIR_PATH"));
@@ -502,6 +698,8 @@ async function main(): Promise<void> {
   const program = createProgram(connection, executor);
 
   console.log(`[degen-executor] executor=${executor.publicKey.toBase58()} poll_ms=${POLL_MS} one_shot=${ONE_SHOT}`);
+
+  await ensureExecutorAta(connection, executor);
 
   do {
     try {

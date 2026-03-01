@@ -9,6 +9,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 import {
   USDC_DECIMALS,
   RoundStatus,
+  DegenModeStatus,
   FEE_BPS,
   USDC_MINT,
   TICKET_UNIT,
@@ -20,12 +21,15 @@ import {
   getRoundPda,
   getParticipantPda,
   buildClaim,
+  buildRequestDegenVrf,
+  fetchDegenClaim,
   type RoundData,
   getProgram,
 } from '../lib/program';
 import { fetchRoundFromFirebase, saveRoundToFirebase } from '../lib/roundArchive';
 import { toHistoryRoundWithDeposits } from '../hooks/useRoundHistory';
 import type { HistoryRound } from '../hooks/useRoundHistory';
+import { fetchDegenTokenMeta } from '../lib/degenClaim';
 import { PARTICIPANT_COLORS } from '../mocks';
 import { formatTs } from '../lib/timeUtils';
 import {
@@ -91,7 +95,7 @@ export default function RoundDetail() {
   const [participants, setParticipants] = useState<ParticipantDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [claiming, setClaiming] = useState(false);
+  const [claimingMode, setClaimingMode] = useState<'usdc' | 'degen' | null>(null);
   const [claimTx, setClaimTx] = useState<string | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
 
@@ -210,7 +214,7 @@ export default function RoundDetail() {
 
   const handleClaim = async () => {
     if (!publicKey || !roundData || !roundDetailId) return;
-    setClaiming(true);
+    setClaimingMode('usdc');
     setClaimError(null);
     try {
       // Pre-check: verify round is still Settled (not already claimed)
@@ -266,7 +270,60 @@ export default function RoundDetail() {
     } catch (e: any) {
       setClaimError(e.message?.slice(0, 80) || 'Claim failed');
     } finally {
-      setClaiming(false);
+      setClaimingMode(null);
+    }
+  };
+
+  const handleClaimDegen = async () => {
+    if (!publicKey || !roundData || !roundDetailId) return;
+    setClaimingMode('degen');
+    setClaimError(null);
+    try {
+      const freshRound = await fetchRound(connection, roundDetailId);
+      if (freshRound && freshRound.status !== RoundStatus.Settled) {
+        setRoundData(freshRound);
+        throw new Error(freshRound.status === RoundStatus.Claimed ? 'Prize already claimed' : 'Round is not in a claimable state');
+      }
+
+      const current = await fetchDegenClaim(program, roundDetailId, publicKey);
+      let requestSig = '';
+
+      if (!current || current.status === 0 || current.status === DegenModeStatus.None) {
+        const reqTx = new Transaction();
+        const reqIx = await buildRequestDegenVrf(program, publicKey, roundDetailId);
+        reqTx.add(reqIx);
+        requestSig = await sendTransaction(reqTx, connection, { skipPreflight: true });
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const degen = await fetchDegenClaim(program, roundDetailId, publicKey);
+      if (!degen) throw new Error('Degen claim state is not available yet');
+
+      if (degen.status === DegenModeStatus.ClaimedFallback) {
+        setClaimTx(requestSig || 'DEGEN_FALLBACK_DONE');
+      } else if (degen.status === DegenModeStatus.ClaimedSwapped) {
+        const tokenMint = degen.tokenMint.equals(PublicKey.default) ? null : degen.tokenMint.toBase58();
+        const tokenSymbol = tokenMint ? (await fetchDegenTokenMeta(tokenMint)).symbol : 'token';
+        setClaimTx(requestSig || `DEGEN_${tokenSymbol || 'TOKEN'}`);
+      } else if (
+        degen.status === DegenModeStatus.VrfRequested ||
+        degen.status === DegenModeStatus.VrfReady ||
+        degen.status === DegenModeStatus.Executing
+      ) {
+        const waitMsg = requestSig
+          ? `DEGEN request sent: ${requestSig}`
+          : 'DEGEN request already pending';
+        setClaimTx(waitMsg);
+      } else {
+        throw new Error('Unexpected degen claim state');
+      }
+
+      const updated = await fetchRound(connection, roundDetailId);
+      if (updated) setRoundData(updated);
+    } catch (e: any) {
+      setClaimError(e.message?.slice(0, 80) || 'Degen claim failed');
+    } finally {
+      setClaimingMode(null);
     }
   };
 
@@ -420,12 +477,12 @@ export default function RoundDetail() {
                       <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">You are the winner! Claim your prize.</p>
                       <button
                         onClick={handleClaim}
-                        disabled={claiming}
+                        disabled={claimingMode !== null}
                         className="group relative w-full h-14 bg-gradient-to-r from-primary to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold text-base rounded-full overflow-hidden transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-primary/25 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
                       >
                         <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
                         <div className="relative flex items-center justify-center gap-3">
-                          {claiming ? (
+                          {claimingMode === 'usdc' ? (
                             <>
                               <Loader2 className="w-5 h-5 animate-spin" />
                               <span className="tracking-wide">CLAIMING...</span>
@@ -438,7 +495,27 @@ export default function RoundDetail() {
                           )}
                         </div>
                       </button>
-                      {claiming && (
+                      <button
+                        onClick={handleClaimDegen}
+                        disabled={claimingMode !== null}
+                        className="group relative mt-2 w-full h-12 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-bold text-sm rounded-full overflow-hidden transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-violet-500/25 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
+                      >
+                        <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="relative flex items-center justify-center gap-3">
+                          {claimingMode === 'degen' ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span className="tracking-wide">DEGEN CLAIM...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Trophy className="w-4 h-4 text-fuchsia-200" />
+                              <span className="tracking-wide">CLAIM DEGEN</span>
+                            </>
+                          )}
+                        </div>
+                      </button>
+                      {claimingMode !== null && (
                         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 animate-pulse">
                           Processing transaction on Solana...
                         </p>
