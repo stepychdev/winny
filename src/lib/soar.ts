@@ -1,4 +1,4 @@
-import { Connection, PublicKey } from "@solana/web3.js";
+import { Connection, PublicKey, Transaction } from "@solana/web3.js";
 import { SoarProgram } from "@magicblock-labs/soar-sdk";
 import { SOAR_LEADERBOARD_PK } from "./constants";
 
@@ -69,4 +69,74 @@ export async function submitVolumeScoreViaApi(
     console.error("[SOAR] Submit API fetch failed:", err);
     throw err;
   }
+}
+
+/**
+ * Ensure the player's SOAR account is initialized and registered for our
+ * leaderboard.  These instructions require the player's wallet signature,
+ * so they MUST happen client-side.
+ *
+ * @param connection  Solana connection
+ * @param playerPk    Player's public key
+ * @param signAndSend A callback (typically from wallet adapter) that signs the
+ *                    transaction with the player's wallet and sends it.  Should
+ *                    return the tx signature.
+ * @returns true if a tx was sent (init/register), false if already set up.
+ */
+export async function ensureSoarPlayerInitialized(
+  connection: Connection,
+  playerPk: PublicKey,
+  signAndSend: (tx: Transaction) => Promise<string>
+): Promise<boolean> {
+  const soar = SoarProgram.getFromConnection(connection, playerPk);
+  const instructions: any[] = [];
+
+  // 1. Check if player account exists
+  const [playerAccountPda] = soar.utils.derivePlayerAddress(playerPk);
+  const playerAccountInfo = await connection.getAccountInfo(playerAccountPda);
+  if (!playerAccountInfo) {
+    const initResult = await soar.initializePlayerAccount(
+      playerPk,
+      playerPk.toBase58().slice(0, 16),
+      PublicKey.default
+    );
+    instructions.push(...initResult.transaction.instructions);
+    console.log("[SOAR] Will init player account");
+  }
+
+  // 2. Check if registered for our leaderboard
+  const [playerScoresPda] = soar.utils.derivePlayerScoresListAddress(
+    playerPk,
+    SOAR_LEADERBOARD_PK
+  );
+  const scoresInfo = await connection.getAccountInfo(playerScoresPda);
+  if (!scoresInfo) {
+    const regResult = await soar.registerPlayerEntryForLeaderBoard(
+      playerPk,
+      SOAR_LEADERBOARD_PK
+    );
+    instructions.push(...regResult.transaction.instructions);
+    console.log("[SOAR] Will register player for leaderboard");
+  }
+
+  if (instructions.length === 0) {
+    console.log("[SOAR] Player already initialized & registered");
+    return false;
+  }
+
+  const tx = new Transaction().add(...instructions);
+  const { blockhash, lastValidBlockHeight } =
+    await connection.getLatestBlockhash("confirmed");
+  tx.recentBlockhash = blockhash;
+  tx.feePayer = playerPk;
+
+  const signature = await signAndSend(tx);
+  console.log("[SOAR] Init/register tx sent:", signature);
+
+  await connection.confirmTransaction(
+    { signature, blockhash, lastValidBlockHeight },
+    "confirmed"
+  );
+  console.log("[SOAR] Init/register tx confirmed:", signature);
+  return true;
 }

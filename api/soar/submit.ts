@@ -67,11 +67,9 @@ export default async function handler(req: any, res: any) {
     const connection = getConnection();
     const authority = loadAuthorityKeypair();
     const playerPk = new PublicKey(playerStr);
-    const gamePk = new PublicKey(SOAR_GAME_PK_STR);
     const leaderboardPk = new PublicKey(SOAR_LEADERBOARD_PK_STR);
 
     console.log("[SOAR] Authority:", authority.publicKey.toBase58());
-    console.log("[SOAR] Game:", gamePk.toBase58());
     console.log("[SOAR] Leaderboard:", leaderboardPk.toBase58());
 
     const provider = new AnchorProvider(
@@ -81,23 +79,21 @@ export default async function handler(req: any, res: any) {
     );
     const soar = SoarProgram.get(provider);
 
-    const instructions: any[] = [];
-
-    // Check if player account exists, if not — add initPlayer ix
+    // ── Pre-flight: player must be initialized & registered client-side ──
     const [playerAccountPda] = soar.utils.derivePlayerAddress(playerPk);
     const playerAccountInfo = await connection.getAccountInfo(playerAccountPda);
     console.log("[SOAR] Player account exists:", !!playerAccountInfo, playerAccountPda.toBase58());
     if (!playerAccountInfo) {
-      const initResult = await soar.initializePlayerAccount(
-        playerPk,
-        playerStr.slice(0, 16),
-        PublicKey.default
-      );
-      instructions.push(...initResult.transaction.instructions);
-      console.log("[SOAR] Added initPlayer ix");
+      // initializePlayer requires the player's wallet signature — can't do server-side.
+      // Client must call ensureSoarPlayerInitialized() before first submit.
+      console.warn("[SOAR] Player account not initialized — returning PLAYER_NOT_INITIALIZED");
+      res.status(428).json({
+        error: "PLAYER_NOT_INITIALIZED",
+        message: "Player SOAR account not initialized. Client must sign initPlayer + registerPlayer first.",
+      });
+      return;
     }
 
-    // Check if player is registered for this leaderboard, if not — add register ix
     const [playerScoresPda] = soar.utils.derivePlayerScoresListAddress(
       playerPk,
       leaderboardPk
@@ -105,26 +101,24 @@ export default async function handler(req: any, res: any) {
     const scoresInfo = await connection.getAccountInfo(playerScoresPda);
     console.log("[SOAR] Player scores exists:", !!scoresInfo, playerScoresPda.toBase58());
     if (!scoresInfo) {
-      const regResult = await soar.registerPlayerEntryForLeaderBoard(
-        playerPk,
-        leaderboardPk
-      );
-      instructions.push(...regResult.transaction.instructions);
-      console.log("[SOAR] Added registerPlayer ix");
+      // registerPlayer also requires the player's wallet signature.
+      console.warn("[SOAR] Player not registered for leaderboard — returning PLAYER_NOT_REGISTERED");
+      res.status(428).json({
+        error: "PLAYER_NOT_REGISTERED",
+        message: "Player not registered for leaderboard. Client must sign registerPlayer first.",
+      });
+      return;
     }
 
-    // Submit score
+    // ── Submit score (only needs authority signature) ──
     const submitResult = await soar.submitScoreToLeaderBoard(
       playerPk,
       authority.publicKey,
       leaderboardPk,
       new BN(totalVolumeCents)
     );
-    instructions.push(...submitResult.transaction.instructions);
-    console.log("[SOAR] Added submitScore ix, total ix count:", instructions.length);
 
-    // Build and sign transaction
-    const tx = new Transaction().add(...instructions);
+    const tx = new Transaction().add(...submitResult.transaction.instructions);
     const { blockhash, lastValidBlockHeight } =
       await connection.getLatestBlockhash("confirmed");
     tx.recentBlockhash = blockhash;
@@ -132,11 +126,30 @@ export default async function handler(req: any, res: any) {
     tx.sign(authority);
 
     const signature = await connection.sendRawTransaction(tx.serialize(), {
-      skipPreflight: true,
+      skipPreflight: false,
       maxRetries: 3,
     });
 
     console.log("[SOAR] Transaction sent:", signature);
+
+    // Wait for on-chain confirmation so we know the score was actually recorded
+    const confirmation = await connection.confirmTransaction(
+      { signature, blockhash, lastValidBlockHeight },
+      "confirmed"
+    );
+
+    if (confirmation.value.err) {
+      console.error("[SOAR] Transaction failed on-chain:", confirmation.value.err);
+      res.status(502).json({
+        error: "TX_FAILED",
+        message: "Score submit transaction failed on-chain",
+        details: confirmation.value.err,
+        signature,
+      });
+      return;
+    }
+
+    console.log("[SOAR] Transaction confirmed:", signature);
     res.status(200).json({ ok: true, signature });
   } catch (e: any) {
     console.error("[SOAR] Submit error:", e?.message || e);

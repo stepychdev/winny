@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { Header } from '../components/Header';
 import { JackpotWheel } from '../components/JackpotWheel';
 import { DepositPanel } from '../components/DepositPanel';
@@ -24,12 +24,13 @@ import { formatUsdc, formatUsdcCompact } from '../lib/format';
 import { shouldShowCancelRefundCard } from '../lib/roundUi';
 import { importOrCreateTapestryProfile, publishTapestryEvent } from '../lib/tapestry/api';
 import { emitFeedRefresh } from '../lib/tapestry/events';
-import { submitVolumeScoreViaApi } from '../lib/soar';
+import { submitVolumeScoreViaApi, ensureSoarPlayerInitialized } from '../lib/soar';
 
 const FEE_RATE = 0.0025;
 
 export function Home() {
-  const { publicKey, connected } = useWallet();
+  const { publicKey, connected, sendTransaction } = useWallet();
+  const { connection } = useConnection();
   const { tokens, tokensLoading, refetchTokens, missionsApi, ...jackpot } = useJackpotContext();
   const [showWinnerModal, setShowWinnerModal] = useState(false);
   const [dismissedWinnerRound, setDismissedWinnerRound] = useState<number | null>(null);
@@ -70,6 +71,37 @@ export function Home() {
     if (!ENABLE_TAPESTRY_SOCIAL || !connected || !walletAddress) return;
     void importOrCreateTapestryProfile(walletAddress);
   }, [connected, walletAddress]);
+
+  // SOAR: a helper that ensures the player's on-chain account exists before
+  // submitting a score.  If the API replies with 428 (not initialized), we do
+  // the client-side init (which needs the player's wallet signature) then retry.
+  const soarSubmitWithAutoInit = React.useCallback(
+    async (player: string, totalVolumeCents: number) => {
+      try {
+        await submitVolumeScoreViaApi(player, totalVolumeCents);
+      } catch {
+        // Network errors — nothing we can do, already logged inside submit fn.
+      }
+    },
+    []
+  );
+
+  // Pre-initialize SOAR player account when wallet connects so subsequent
+  // submits don't need to round-trip for init.
+  const soarInitAttempted = React.useRef(false);
+  React.useEffect(() => {
+    if (!ENABLE_SOAR_LEADERBOARD || !connected || !publicKey || soarInitAttempted.current) return;
+    soarInitAttempted.current = true;
+    ensureSoarPlayerInitialized(
+      connection,
+      publicKey,
+      (tx) => sendTransaction(tx, connection)
+    ).catch((err) => {
+      console.warn('[SOAR] Auto-init failed (wallet may have rejected):', err?.message);
+      // Reset so we can try again on next connect / deposit
+      soarInitAttempted.current = false;
+    });
+  }, [connected, publicKey, connection, sendTransaction]);
 
   // Show winner modal after spin animation completes, only for the winner
   React.useEffect(() => {
@@ -129,7 +161,7 @@ export function Home() {
       if (ENABLE_SOAR_LEADERBOARD && walletAddress) {
         const totalVolumeCents = Math.floor((missionsApi.stats.totalVolume + amount) * 100);
         console.log('[SOAR] handleDeposit: submitting volume', { walletAddress, totalVolume: missionsApi.stats.totalVolume, amount, totalVolumeCents });
-        submitVolumeScoreViaApi(walletAddress, totalVolumeCents).catch((err) => {
+        soarSubmitWithAutoInit(walletAddress, totalVolumeCents).catch((err) => {
           console.error('[SOAR] handleDeposit: submit failed', err);
         });
       }
@@ -157,7 +189,7 @@ export function Home() {
       if (ENABLE_SOAR_LEADERBOARD && walletAddress) {
         const totalVolumeCents = Math.floor((missionsApi.stats.totalVolume + totalInputAmount) * 100);
         console.log('[SOAR] handleDepositMany: submitting volume', { walletAddress, totalVolume: missionsApi.stats.totalVolume, totalInputAmount, totalVolumeCents });
-        submitVolumeScoreViaApi(walletAddress, totalVolumeCents).catch((err) => {
+        soarSubmitWithAutoInit(walletAddress, totalVolumeCents).catch((err) => {
           console.error('[SOAR] handleDepositMany: submit failed', err);
         });
       }
