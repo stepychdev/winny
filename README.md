@@ -85,6 +85,31 @@ This is not a simulated casino — Winny is a real token-flow game where you can
 
 Each step is a separate on-chain instruction. Anyone can verify the flow on Solscan.
 
+### 🔍 On-Chain Proof: A Full Round Lifecycle (with Degen Claim)
+
+Every round is executed 100% on-chain. Here is a comprehensive trace of a real, completed round (PDA: [`8XWdjJ...wnz`](https://solscan.io/account/8XWdjJr2fFT3enmxd1u2Kh29w1YkE2i9poMezo3vAwnz)) on Solana Mainnet:
+
+1. **[Start Round]** - Admin crank allocates the Round PDA and sets the timer. 
+   → [Tx: `5ffHzG...nTAh`](https://solscan.io/tx/5ffHzG8w2cX6mUqWn121Td5aHDG4UgfPNxUfzAWeEwTTDyFKFwjm3UbuvRgz3N6nNza5XzAEJhGrXssUocs3nTAh)
+2. **[Deposit Player 1]** - Player 1 joins the round with pure USDC. Participant PDA is funded.
+   → [Tx: `4tksQM...xcH`](https://solscan.io/tx/4tksQMJM9dTdf5Ve7EqB6ySnTuYguK3jbj3UFtvUG5eC7HvQhFrBGZ4ZaPNWXJMCb8yrtVN5SLWMULJVfj4s6xcH)
+3. **[Deposit Player 2]** - Player 2 joins with a non-USDC SPL token. The contract queries the **Jupiter API** (`/ultra/v1`) to atomically swap the asset into USDC.
+   → [Tx: `5Uynm1...iis`](https://solscan.io/tx/5Uynm1bwngs4n96spY1PANiw4uzeBWDea79XDkJ4Jr1pKjGVqmvnLKBcX3PqYC7fXWa321NbTkJpo3FW3K6bEiis)
+4. **[Lock Round]** - The timer ends and the round state is locked.
+   → [Tx: `VdQbJv...xxV`](https://solscan.io/tx/VdQbJv6a3GmQWgz6PtwnMhZjMC7zAhRsqcfThMcVgxJJEkqakcZ1Y55FhhMoz6fjPNTpYDZavsmRuzZcCBVHxxV) *(+ other crank txs)*
+5. **[Request VRF]** - Entropy is requested from the **MagicBlock VRF Plugin** for fair winner selection.
+   → [Tx: `2Uig5H...kwc`](https://solscan.io/tx/2Uig5HJfCSSCSiZduUQegFCRRvVNCCg7qmgyPpuoH1JsEyGn2dFkw6S8QEC2cnDcf1P1yR9kybjLN9J1Au3Gfkwc)
+6. **[Settle Round]** - VRF callback is received. MagicBlock generates provable randomness and selects the winner fully on-chain.
+   → [Tx: `4cvRKB...pS3`](https://solscan.io/tx/4cvRKBdD4uWSY7kR6CqAgWbNSESyCS1PbrerDmWCUKnX152MMyGWJ9QndqkGKpUytucQLQQvmk1YHqqFsrHkP8S3)
+7. **[Degen VRF Request]** - Winner opts into Degen Mode! A second **MagicBlock VRF** is requested to pick random payout tokens.
+   → [Tx: `2JDrGJ...CuV`](https://solscan.io/tx/2JDrGJUTaWNok1g4SEZvhczUgXWGfr6cjmwCHCZy3GB3W8C7CtMYrzFzKkhvU7H4CbstnJkmUWMHuYiT3ZBAyCuV)
+8. **[Degen Execution 1]** - First attempt to execute the random payout swap via **Jupiter**. 
+   → [Tx: `Jjo2hR...D9X`](https://solscan.io/tx/Jjo2hR8PzM4bT7DUyvHgU2dyNdpZ4i7XB7vkgvzRq6UnrJtosnXmW5xAUBjXv6RdSq66Z6q18zXKTbLMsafzD9X) ❌ *(Failed: Slippage/Liquidity bounds exceeded on Jupiter)*
+9. **[Degen Execution 2]** - Executor dynamically retries the **Jupiter** integration for the payout and succeeds.
+   → [Tx: `63GFWD...fch`](https://solscan.io/tx/63GFWDwP55vFVFZBPoKcdHd2SfRjQiUbFVjw5ka86HedDykJ6qQVpR9xu5fyezcWka4shREbLcYEZhw8U7XDufch) ✅ *(Success!)*
+10. **[Prize Transfer & Cleanup]** - The winner receives their payout. Rent is reclaimed by closing the Round and Participant PDAs.
+    → [Tx: `3pzdMA...yfW`](https://solscan.io/tx/3pzdMA6NswrLjv4dEY6G1oVBotC8Me4APxnjdZinRwDV11DmvWYSBtnzeFmWoJQDNTumMwNWMqjNYE9Zbvp45yfW), [Tx: `3uGhfC...Uw3y`](https://solscan.io/tx/3uGhfChxzx42PCuspw7aByiQXUBWsiYFugdHgHktmjSbBfKhzvS6hqB6PUBmjUDQaWeXFgLgXHXTDEWxpnuvUw3y) *(+ several cleanup trace txs)*
+
 ---
 
 ## Degen Claim Mode
