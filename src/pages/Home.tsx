@@ -14,7 +14,7 @@ import { Chat } from '../components/Chat';
 import { UnclaimedBadge } from '../components/UnclaimedBadge';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { RecentWinners } from '../components/RecentWinners';
-import { LiveTicker } from '../components/LiveTicker';
+
 import { SocialActivityCard } from '../components/social/SocialActivityCard';
 import { useJackpotContext } from '../contexts/JackpotContext';
 import type { DepositLegInput } from '../hooks/useJackpot';
@@ -447,13 +447,8 @@ export function Home() {
           )}
         </div>
 
-        {/* ── Live Ticker ── */}
-        <div className="mt-3 py-2 px-1 rounded-xl dark:bg-slate-900/80 backdrop-blur-sm border border-slate-800/50">
-          <LiveTicker />
-        </div>
-
-        {/* ── Recent Winners ── */}
-        <div className="mt-2 sm:mt-3">
+        {/* ── Recent Winners (marquee) ── */}
+        <div className="mt-3">
           <RecentWinners />
         </div>
       </main>
