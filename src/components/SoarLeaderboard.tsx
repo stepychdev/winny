@@ -30,7 +30,7 @@ export function SoarLeaderboard({ compact = false }: SoarLeaderboardProps) {
 
   const { entries, loading, refresh } = useSoarLeaderboard();
   const { navigateToPlayer } = useNavigation();
-  const displayCount = compact ? 5 : 20;
+  const displayCount = compact ? 5 : 50;
   const visible = entries.slice(0, displayCount);
 
   const wallets = visible.map((e) => e.player);

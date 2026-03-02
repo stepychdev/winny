@@ -5,12 +5,15 @@ import { Trophy, Zap, CheckCircle, Loader2, Gift, ExternalLink } from 'lucide-re
 import { Header } from '../components/Header';
 import { SoarLeaderboard } from '../components/SoarLeaderboard';
 import { ENABLE_SOAR_LEADERBOARD, TREASURY_USDC_ATA, SOLSCAN_CLUSTER_QUERY } from '../lib/constants';
-import { ensureSoarPlayerInitialized, checkSoarPlayerStatus } from '../lib/soar';
+import { ensureSoarPlayerInitialized, checkSoarPlayerStatus, submitVolumeScoreViaApi } from '../lib/soar';
+import { useMissions } from '../hooks/useMissions';
 
 export function Leaderboard() {
   const { publicKey, connected, sendTransaction } = useWallet();
   const { connection } = useConnection();
   const { setVisible } = useWalletModal();
+  const walletAddress = publicKey?.toBase58() ?? null;
+  const { stats } = useMissions(walletAddress);
 
   const [status, setStatus] = useState<'loading' | 'not-registered' | 'registered'>('loading');
   const [registering, setRegistering] = useState(false);
@@ -49,13 +52,23 @@ export function Leaderboard() {
         (tx) => sendTransaction(tx, connection)
       );
       setStatus('registered');
+
+      // After registration, immediately submit the player's current volume so
+      // they appear on the leaderboard without needing another deposit.
+      if (walletAddress && stats.totalVolume > 0) {
+        const totalVolumeCents = Math.floor(stats.totalVolume * 100);
+        console.log('[SOAR] Post-registration score submit:', { walletAddress, totalVolumeCents });
+        submitVolumeScoreViaApi(walletAddress, totalVolumeCents).catch((err) => {
+          console.error('[SOAR] Post-registration score submit failed:', err);
+        });
+      }
     } catch (err: any) {
       console.error('[SOAR] Registration failed:', err);
       setError(err?.message?.includes('User rejected') ? 'Transaction cancelled' : 'Registration failed — try again');
     } finally {
       setRegistering(false);
     }
-  }, [publicKey, connection, sendTransaction, setVisible]);
+  }, [publicKey, connection, sendTransaction, setVisible, walletAddress, stats.totalVolume]);
 
   return (
     <div className="min-h-screen flex flex-col bg-background dark:bg-[#0f1219] text-slate-900 dark:text-slate-100">
