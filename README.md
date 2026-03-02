@@ -87,28 +87,81 @@ Each step is a separate on-chain instruction. Anyone can verify the flow on Sols
 
 ### 🔍 On-Chain Proof: A Full Round Lifecycle (with Degen Claim)
 
-Every round is executed 100% on-chain. Here is a comprehensive trace of a real, completed round (PDA: [`8XWdjJ...wnz`](https://solscan.io/account/8XWdjJr2fFT3enmxd1u2Kh29w1YkE2i9poMezo3vAwnz)) on Solana Mainnet:
+Every round is executed 100% on-chain. Here is a comprehensive trace of **Round #148** (PDA: [`8XWdjJ...wnz`](https://solscan.io/account/8XWdjJr2fFT3enmxd1u2Kh29w1YkE2i9poMezo3vAwnz)) on Solana Mainnet:
 
-1. **[Start Round]** - Admin crank allocates the Round PDA and sets the timer. 
-   → [Tx: `5ffHzG...nTAh`](https://solscan.io/tx/5ffHzG8w2cX6mUqWn121Td5aHDG4UgfPNxUfzAWeEwTTDyFKFwjm3UbuvRgz3N6nNza5XzAEJhGrXssUocs3nTAh)
-2. **[Deposit Player 1]** - Player 1 joins the round with pure USDC. Participant PDA is funded.
-   → [Tx: `4tksQM...xcH`](https://solscan.io/tx/4tksQMJM9dTdf5Ve7EqB6ySnTuYguK3jbj3UFtvUG5eC7HvQhFrBGZ4ZaPNWXJMCb8yrtVN5SLWMULJVfj4s6xcH)
-3. **[Deposit Player 2]** - Player 2 joins with a non-USDC SPL token. The contract queries the **Jupiter API** (`/ultra/v1`) to atomically swap the asset into USDC.
-   → [Tx: `5Uynm1...iis`](https://solscan.io/tx/5Uynm1bwngs4n96spY1PANiw4uzeBWDea79XDkJ4Jr1pKjGVqmvnLKBcX3PqYC7fXWa321NbTkJpo3FW3K6bEiis)
-4. **[Lock Round]** - The timer ends and the round state is locked.
-   → [Tx: `VdQbJv...xxV`](https://solscan.io/tx/VdQbJv6a3GmQWgz6PtwnMhZjMC7zAhRsqcfThMcVgxJJEkqakcZ1Y55FhhMoz6fjPNTpYDZavsmRuzZcCBVHxxV) *(+ other crank txs)*
-5. **[Request VRF]** - Entropy is requested from the **MagicBlock VRF Plugin** for fair winner selection.
-   → [Tx: `2Uig5H...kwc`](https://solscan.io/tx/2Uig5HJfCSSCSiZduUQegFCRRvVNCCg7qmgyPpuoH1JsEyGn2dFkw6S8QEC2cnDcf1P1yR9kybjLN9J1Au3Gfkwc)
-6. **[Settle Round]** - VRF callback is received. MagicBlock generates provable randomness and selects the winner fully on-chain.
-   → [Tx: `4cvRKB...pS3`](https://solscan.io/tx/4cvRKBdD4uWSY7kR6CqAgWbNSESyCS1PbrerDmWCUKnX152MMyGWJ9QndqkGKpUytucQLQQvmk1YHqqFsrHkP8S3)
-7. **[Degen VRF Request]** - Winner opts into Degen Mode! A second **MagicBlock VRF** is requested to pick random payout tokens.
-   → [Tx: `2JDrGJ...CuV`](https://solscan.io/tx/2JDrGJUTaWNok1g4SEZvhczUgXWGfr6cjmwCHCZy3GB3W8C7CtMYrzFzKkhvU7H4CbstnJkmUWMHuYiT3ZBAyCuV)
-8. **[Degen Execution 1]** - First attempt to execute the random payout swap via **Jupiter**. 
-   → [Tx: `Jjo2hR...D9X`](https://solscan.io/tx/Jjo2hR8PzM4bT7DUyvHgU2dyNdpZ4i7XB7vkgvzRq6UnrJtosnXmW5xAUBjXv6RdSq66Z6q18zXKTbLMsafzD9X) ❌ *(Failed: Slippage/Liquidity bounds exceeded on Jupiter)*
-9. **[Degen Execution 2]** - Executor dynamically retries the **Jupiter** integration for the payout and succeeds.
-   → [Tx: `63GFWD...fch`](https://solscan.io/tx/63GFWDwP55vFVFZBPoKcdHd2SfRjQiUbFVjw5ka86HedDykJ6qQVpR9xu5fyezcWka4shREbLcYEZhw8U7XDufch) ✅ *(Success!)*
-10. **[Prize Transfer & Cleanup]** - The winner receives their payout. Rent is reclaimed by closing the Round and Participant PDAs.
-    → [Tx: `3pzdMA...yfW`](https://solscan.io/tx/3pzdMA6NswrLjv4dEY6G1oVBotC8Me4APxnjdZinRwDV11DmvWYSBtnzeFmWoJQDNTumMwNWMqjNYE9Zbvp45yfW), [Tx: `3uGhfC...Uw3y`](https://solscan.io/tx/3uGhfChxzx42PCuspw7aByiQXUBWsiYFugdHgHktmjSbBfKhzvS6hqB6PUBmjUDQaWeXFgLgXHXTDEWxpnuvUw3y) *(+ several cleanup trace txs)*
+1. **[start_round] — Open Round & Allocate PDA**
+   → [Tx: `3uGhfC...Uw3y`](https://solscan.io/tx/3uGhfChxzx42PCuspw7aByiQXUBWsiYFugdHgHktmjSbBfKhzvS6hqB6PUBmjUDQaWeXFgLgXHXTDEWxpnuvUw3y) | 34,230 CU
+   - Crank `7vwajf1z...` allocates Round PDA (0 → 0.058 SOL rent) and USDC vault ATA
+   - Creates vault `2t3YiYdi...` for USDC token account owned by the round PDA
+   - Round timer starts
+
+2. **[deposit_any] — Player 1  deposits USDC**
+   → [Tx: `3CUTkG...ficas`](https://solscan.io/tx/3CUTkGcfpjQYJVNgbV1kMSTNZZCyvQ1mkBH6Qh72RVNr1Uy1aW2ket2nzPqRozUpKfXxWnW3QwT7eVajKweficas) | 30,675 CU
+   - Player `CxrzwPcLN...` deposits USDC into the round
+   - Creates Participant PDA `9sooYs2ap...` (0 → 0.00166 SOL rent)
+   - SPL Transfer: USDC from player → vault
+   - Jito tip for priority landing
+
+3. **[deposit_any] — Player 2  deposits USDC**
+   → [Tx: `3pzdMA...yfW`](https://solscan.io/tx/3pzdMA6NswrLjv4dEY6G1oVBotC8Me4APxnjdZinRwDV11DmvWYSBtnzeFmWoJQDNTumMwNWMqjNYE9Zbvp45yfW) | 30,185 CU
+   - Player `5mjKaFPX...` deposits USDC into the round
+   - Creates Participant PDA `35VWPbLF...`
+   - SPL Transfer: USDC from player → vault
+
+4. **[deposit_any] — Player 1 adds more USDC (top-up)**
+   → [Tx: `5bDWAN...z4gG`](https://solscan.io/tx/5bDWAN7vtbymn5tFHDbS3AuVeH8BGz4HHaoHtFvDv78kJQATdUYAfe6KCqnh2AAZC7334dsBkKjPWbrV2reYz4gG) | 29,868 CU
+   - Player `CxrzwPcLN...` adds additional USDC to the same round
+   - Re-uses existing Participant PDA `9sooYs2ap...`
+   - SPL Transfer: more USDC → vault
+
+5. **[deposit_any] — Player 1 adds even more USDC**
+   → [Tx: `297twR...Hddf`](https://solscan.io/tx/297twRJZMp7frLg1LrYW36SBeqTs4vfQdgV5ctiTcJYhm4EQE7ChJEnzUervzRb6geCX5okdWDvP5LpDa6LzHddf) | 29,868 CU
+   - Same pattern — re-uses existing participant PDA
+
+6. **[lock_round + request_vrf] — Timer Ends, Request Randomness**
+   → [Tx: `2e6Nrz...RmSH`](https://solscan.io/tx/2e6Nrzv9U2BuwAuG4d3yL4Msz8JY8b3xp9XKiuVKLbkQifzeh7rzPr1stw16wBVuLHRa238589XvWnsMXL1jRmSH) | 24,919 CU
+   - Crank locks the round (no more deposits)
+   - Requests **MagicBlock VRF** for winner selection
+   - CPI into VRF program → creates VRF request PDA
+
+7. **[vrf_callback ✅] — Winner Selection via VRF**
+   → [Tx: `63GFWD...Dufch`](https://solscan.io/tx/63GFWDwP55vFVFZBPoKcdHd2SfRjQiUbFVjw5ka86HedDykJ6qQVpR9xu5fyezcWka4shREbLcYEZhw8U7XDufch) | 39,175 CU
+   - **MagicBlock VRF** successfully fulfills the request
+   - Writes 32 bytes of provable randomness into Round PDA
+   - Program computes winning_ticket = hash(randomness) % total_tickets
+   - Round status → Settled, winner determined
+
+8. **[request_degen_vrf] — Winner Opts Into Degen Claim Mode**
+   → [Tx: `2JDrGJ...yCuV`](https://solscan.io/tx/2JDrGJUTaWNok1g4SEZvhczUgXWGfr6cjmwCHCZy3GB3W8C7CtMYrzFzKkhvU7H4CbstnJkmUWMHuYiT3ZBAyCuV) | 30,689 CU
+   - Crank initiates Degen Claim Mode for the winner
+   - Creates DegenClaim PDA
+   - Requests a second independent **MagicBlock VRF** for random token selection
+
+9. **[degen_vrf_callback ✅] — Random Token Candidates Derived**
+    → [Tx: `4cvRKB...kP8S3`](https://solscan.io/tx/4cvRKBdD4uWSY7kR6CqAgWbNSESyCS1PbrerDmWCUKnX152MMyGWJ9QndqkGKpUytucQLQQvmk1YHqqFsrHkP8S3) | 48,584 CU
+    - **MagicBlock VRF** successfully fulfills degen VRF
+    - Program derives 10 candidate tokens over a pool of 4,500+ verified **Jupiter** tokens
+
+10. **[begin_degen_execution + Jupiter Swap + finalize] — Degen Payout!**
+    → [Tx: `3JdrBB...HqNQ`](https://solscan.io/tx/3JdrBB4SaYC2F9oWkSzbgwWnrzwdhBZuquYpWfY1SXqv5YjBD4ZAYxBMroUNSWUr3GwPi5EostNeBoj6MSYNHqNQ) | 197,054 CU
+    - Degen Executor atomic V0 transaction:
+    - Transfers USDC from vault to executor
+    - **Jupiter SharedAccountsRoute** — USDC → output token swap (Orca Whirlpool → Raydium) using ALT compression
+    - `finalize_degen_success` — verifies executor received ≥ min_out_raw tokens, transfers tokens to winner
+    - Winner `Cxrz...` receives random token instead of boring USDC!
+
+11. **[close_participant] — Reclaim Player 1 Rent**
+    → [Tx: `5Uynm1...bEiis`](https://solscan.io/tx/5Uynm1bwngs4n96spY1PANiw4uzeBWDea79XDkJ4Jr1pKjGVqmvnLKBcX3PqYC7fXWa321NbTkJpo3FW3K6bEiis) | ~6,000 CU
+    - Crank closes Participant PDA for player 1. Rent returned.
+
+12. **[close_participant] — Reclaim Player 2 Rent**
+    → [Tx: `4tksQM...s6xcH`](https://solscan.io/tx/4tksQMJM9dTdf5Ve7EqB6ySnTuYguK3jbj3UFtvUG5eC7HvQhFrBGZ4ZaPNWXJMCb8yrtVN5SLWMULJVfj4s6xcH) | ~6,000 CU
+    - Crank closes Participant PDA for player 2. Rent returned.
+
+13. **[close_round] — Reclaim Round PDA & Drain Vault**
+    → [Tx: `5ffHzG...3nTAh`](https://solscan.io/tx/5ffHzG8w2cX6mUqWn121Td5aHDG4UgfPNxUfzAWeEwTTDyFKFwjm3UbuvRgz3N6nNza5XzAEJhGrXssUocs3nTAh) | ~8,500 CU
+    - Crank closes Round PDA `8XWdjJr2f...`
+    - Drains any residual dust from vault. Round fully cleaned up.
 
 ---
 
