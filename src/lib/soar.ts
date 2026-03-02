@@ -47,13 +47,32 @@ export async function fetchLeaderboard(
     leaderboard.topEntries
   );
 
-  return topEntries.topScores
-    .filter((s) => s.entry.score.toNumber() > 0)
-    .map((s, i) => ({
-      player: s.player.toBase58(),
-      score: s.entry.score.toNumber(),
-      rank: i + 1,
-    }));
+  const nonZero = topEntries.topScores.filter(
+    (s) => s.entry.score.toNumber() > 0
+  );
+
+  // topEntries.player is the Player PDA, not the actual wallet.
+  // Fetch all PlayerAccounts in one batch to resolve PDA → real wallet.
+  const playerPdas = nonZero.map((s) => s.player);
+  const playerAccounts = await connection.getMultipleAccountsInfo(playerPdas);
+
+  // SOAR PlayerAccount layout: 8-byte discriminator + 32-byte user pubkey
+  const resolvedWallets = playerAccounts.map((acctInfo, i) => {
+    if (acctInfo?.data && acctInfo.data.length >= 40) {
+      try {
+        return new PublicKey(acctInfo.data.subarray(8, 40)).toBase58();
+      } catch {
+        // fallback to PDA
+      }
+    }
+    return playerPdas[i].toBase58();
+  });
+
+  return nonZero.map((s, i) => ({
+    player: resolvedWallets[i],
+    score: s.entry.score.toNumber(),
+    rank: i + 1,
+  }));
 }
 
 /**
