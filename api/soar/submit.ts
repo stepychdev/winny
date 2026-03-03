@@ -11,6 +11,61 @@ import BN from "bn.js";
 const RPC_URL = process.env.ACTIONS_RPC_URL || process.env.SOLANA_RPC_UPSTREAM;
 const SOAR_GAME_PK_STR = process.env.SOAR_GAME_PK || "";
 const SOAR_LEADERBOARD_PK_STR = process.env.SOAR_LEADERBOARD_PK || "";
+const FIREBASE_DB_URL = (
+  process.env.FIREBASE_DATABASE_URL ||
+  process.env.VITE_FIREBASE_DATABASE_URL ||
+  ""
+).replace(/\/$/, "");
+
+/**
+ * Compute a player's total deposit volume (in USDC) from Firebase round archive.
+ * Returns 0 if Firebase is unavailable or the player has no deposits.
+ */
+async function fetchPlayerVolumeFromFirebase(
+  walletAddress: string
+): Promise<number> {
+  if (!FIREBASE_DB_URL) {
+    console.warn("[SOAR] FIREBASE_DB_URL not set — skipping volume lookup");
+    return 0;
+  }
+  try {
+    const url = `${FIREBASE_DB_URL}/rounds.json`;
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      console.warn("[SOAR] Firebase fetch failed:", resp.status);
+      return 0;
+    }
+    const rounds = await resp.json();
+    if (!rounds || typeof rounds !== "object") return 0;
+
+    let totalUsdc = 0;
+    for (const roundId of Object.keys(rounds)) {
+      const round = rounds[roundId];
+      if (!round || typeof round !== "object") continue;
+      const deposits = round.participantDeposits;
+      if (!deposits) continue;
+      // Firebase may store sparse arrays with null holes or objects
+      const arr: any[] = Array.isArray(deposits)
+        ? deposits
+        : typeof deposits === "object"
+          ? Object.values(deposits)
+          : [];
+      for (const dep of arr) {
+        if (
+          dep != null &&
+          dep.address === walletAddress &&
+          typeof dep.usdc === "number"
+        ) {
+          totalUsdc += dep.usdc;
+        }
+      }
+    }
+    return totalUsdc;
+  } catch (e: any) {
+    console.warn("[SOAR] Firebase volume lookup error:", e.message);
+    return 0;
+  }
+}
 
 function loadAuthorityKeypair(): Keypair {
   const raw = process.env.SOAR_AUTHORITY_KEYPAIR;
@@ -51,9 +106,29 @@ export default async function handler(req: any, res: any) {
       res.status(400).json({ error: "player is required" });
       return;
     }
-    if (typeof totalVolumeCents !== "number" || totalVolumeCents <= 0) {
-      console.error("[SOAR] Invalid totalVolumeCents:", totalVolumeCents);
-      res.status(400).json({ error: "totalVolumeCents must be a positive number" });
+
+    // Client-sent volume (may be 0 or missing — Firebase will provide the real value)
+    const clientVolumeCents =
+      typeof totalVolumeCents === "number" && totalVolumeCents > 0
+        ? totalVolumeCents
+        : 0;
+
+    // Compute real volume from Firebase round archive
+    const firebaseVolumeUsdc = await fetchPlayerVolumeFromFirebase(playerStr);
+    const firebaseVolumeCents = Math.floor(firebaseVolumeUsdc * 100);
+
+    // Use whichever is higher (client may know about a very recent deposit
+    // not yet archived; Firebase has the full history)
+    const finalVolumeCents = Math.max(clientVolumeCents, firebaseVolumeCents);
+
+    console.log("[SOAR] Volume resolution:", {
+      clientVolumeCents,
+      firebaseVolumeCents,
+      finalVolumeCents,
+    });
+
+    if (finalVolumeCents <= 0) {
+      res.status(200).json({ ok: true, skipped: true, reason: "zero volume" });
       return;
     }
 
@@ -115,7 +190,7 @@ export default async function handler(req: any, res: any) {
       playerPk,
       authority.publicKey,
       leaderboardPk,
-      new BN(totalVolumeCents)
+      new BN(finalVolumeCents)
     );
 
     const tx = new Transaction().add(...submitResult.transaction.instructions);
@@ -150,7 +225,7 @@ export default async function handler(req: any, res: any) {
     }
 
     console.log("[SOAR] Transaction confirmed:", signature);
-    res.status(200).json({ ok: true, signature });
+    res.status(200).json({ ok: true, signature, finalVolumeCents });
   } catch (e: any) {
     console.error("[SOAR] Submit error:", e?.message || e);
     console.error("[SOAR] Stack:", e?.stack);

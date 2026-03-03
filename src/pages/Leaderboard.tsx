@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
-import { Trophy, Zap, CheckCircle, Loader2, Gift, ExternalLink } from 'lucide-react';
+import { Trophy, Zap, CheckCircle, Loader2, Gift, ExternalLink, RefreshCw } from 'lucide-react';
 import { Header } from '../components/Header';
 import { SoarLeaderboard } from '../components/SoarLeaderboard';
 import { ENABLE_SOAR_LEADERBOARD, TREASURY_USDC_ATA, SOLSCAN_CLUSTER_QUERY } from '../lib/constants';
@@ -17,6 +17,7 @@ export function Leaderboard() {
 
   const [status, setStatus] = useState<'loading' | 'not-registered' | 'registered'>('loading');
   const [registering, setRegistering] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Check registration status when wallet connects
@@ -53,10 +54,12 @@ export function Leaderboard() {
       );
       setStatus('registered');
 
-      // After registration, immediately submit the player's current volume so
-      // they appear on the leaderboard without needing another deposit.
-      if (walletAddress && stats.totalVolume > 0) {
-        const totalVolumeCents = Math.floor(stats.totalVolume * 100);
+      // After registration, submit the player's volume.
+      // The API computes real volume from Firebase, so we always call it
+      // (even if local stats show 0 — the user may have deposited before
+      // the missions system existed or from a different browser).
+      if (walletAddress) {
+        const totalVolumeCents = Math.floor(Math.max(stats.totalVolume, 0) * 100);
         console.log('[SOAR] Post-registration score submit:', { walletAddress, totalVolumeCents });
         submitVolumeScoreViaApi(walletAddress, totalVolumeCents).catch((err) => {
           console.error('[SOAR] Post-registration score submit failed:', err);
@@ -69,6 +72,20 @@ export function Leaderboard() {
       setRegistering(false);
     }
   }, [publicKey, connection, sendTransaction, setVisible, walletAddress, stats.totalVolume]);
+
+  const handleSyncVolume = useCallback(async () => {
+    if (!walletAddress) return;
+    setSyncing(true);
+    try {
+      const totalVolumeCents = Math.floor(Math.max(stats.totalVolume, 0) * 100);
+      console.log('[SOAR] Manual sync:', { walletAddress, totalVolumeCents });
+      await submitVolumeScoreViaApi(walletAddress, totalVolumeCents);
+    } catch (err: any) {
+      console.error('[SOAR] Sync failed:', err);
+    } finally {
+      setSyncing(false);
+    }
+  }, [walletAddress, stats.totalVolume]);
 
   return (
     <div className="min-h-screen flex flex-col bg-background dark:bg-[#0f1219] text-slate-900 dark:text-slate-100">
@@ -115,11 +132,22 @@ export function Leaderboard() {
 
         {/* Registered confirmation */}
         {ENABLE_SOAR_LEADERBOARD && status === 'registered' && (
-          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40">
-            <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            <span className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">
-              You're registered — your volume is being tracked!
-            </span>
+          <div className="flex items-center justify-between gap-2 px-4 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">
+                You're registered — your volume is being tracked!
+              </span>
+            </div>
+            <button
+              onClick={handleSyncVolume}
+              disabled={syncing}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors disabled:opacity-50"
+              title="Re-sync your volume from on-chain history"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing...' : 'Sync Volume'}
+            </button>
           </div>
         )}
 
