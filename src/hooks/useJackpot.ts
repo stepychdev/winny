@@ -803,6 +803,29 @@ export function useJackpot(): JackpotState {
     }
   }, [phase, roundId, unclaimedPrizes]);
 
+  // Periodically re-validate unclaimed prizes against on-chain state.
+  // Covers cases where a prize is claimed via RoundDetail, auto-claim, or another tab.
+  useEffect(() => {
+    if (unclaimedPrizes.length === 0) return;
+    let cancelled = false;
+    const revalidate = async () => {
+      const toRemove: number[] = [];
+      for (const prize of unclaimedPrizes) {
+        try {
+          const data = await fetchRound(connection, prize.roundId);
+          if (!data || data.status !== RoundStatus.Settled) {
+            toRemove.push(prize.roundId);
+          }
+        } catch { /* keep on error */ }
+      }
+      if (cancelled || toRemove.length === 0) return;
+      for (const rid of toRemove) clearUnclaimedPrize(rid);
+      setUnclaimedPrizes(prev => prev.filter(p => !toRemove.includes(p.roundId)));
+    };
+    const timer = setInterval(revalidate, 10_000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [unclaimedPrizes, connection]);
+
   // Flag to pause auto-advance (e.g. while winner modal is open)
   const pauseAutoAdvanceRef = useRef(false);
   const setPauseAutoAdvance = useCallback((paused: boolean) => {

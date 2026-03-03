@@ -28,6 +28,7 @@ import {
 } from '../lib/program';
 import { fetchRoundFromFirebase, saveRoundToFirebase } from '../lib/roundArchive';
 import { toHistoryRoundWithDeposits } from '../hooks/useRoundHistory';
+import { clearUnclaimedPrize } from '../hooks/useJackpot';
 import type { HistoryRound } from '../hooks/useRoundHistory';
 import { fetchDegenTokenMeta } from '../lib/degenClaim';
 import { PARTICIPANT_COLORS } from '../mocks';
@@ -254,6 +255,9 @@ export default function RoundDetail() {
       const sig = await sendTransaction(tx, connection, { skipPreflight: true });
       setClaimTx(sig);
 
+      // Clear the unclaimed prize badge (it may have been shown from Home page)
+      clearUnclaimedPrize(roundDetailId);
+
       // Re-fetch round to update status
       const fresh = await fetchRound(connection, roundDetailId);
       if (fresh) setRoundData(fresh);
@@ -318,6 +322,9 @@ export default function RoundDetail() {
       } else {
         throw new Error('Unexpected degen claim state');
       }
+
+      // Clear the unclaimed prize badge
+      clearUnclaimedPrize(roundDetailId);
 
       const updated = await fetchRound(connection, roundDetailId);
       if (updated) setRoundData(updated);
