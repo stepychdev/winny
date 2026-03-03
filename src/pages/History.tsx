@@ -74,7 +74,9 @@ export default function History() {
           );
 
           let claimSig: string | null = null;
-          for (const sigInfo of signatures) {
+          // Only inspect a limited number of recent txs (claim is usually among the last few)
+          const candidates = signatures.filter((s) => !s.err).slice(0, 15);
+          for (const sigInfo of candidates) {
             const parsed = await connection.getParsedTransaction(sigInfo.signature, {
               commitment: 'confirmed',
               maxSupportedTransactionVersion: 0,
@@ -82,13 +84,28 @@ export default function History() {
 
             if (!parsed?.meta?.logMessages) continue;
             const logs = parsed.meta.logMessages;
+            const pid = PROGRAM_ID.toBase58();
             const hasProgramInvoke = logs.some((line) =>
-              line.includes(`Program ${PROGRAM_ID.toBase58()} invoke`)
+              line.includes(`Program ${pid} invoke`)
             );
-            const hasClaimInstruction = logs.some((line) =>
-              line.includes('Instruction: Claim')
+            if (!hasProgramInvoke) continue;
+
+            // Anchor-style detection (legacy / anchor programs)
+            const hasAnchorClaim = logs.some((line) =>
+              line.includes('Instruction: Claim') || line.includes('Instruction: AutoClaim')
             );
-            if (hasProgramInvoke && hasClaimInstruction) {
+            if (hasAnchorClaim) {
+              claimSig = sigInfo.signature;
+              break;
+            }
+
+            // Pinocchio-style detection: claim does 2+ spl-token CPI calls
+            // (vault→winner + vault→treasury), while deposits do 1 and
+            // close_round/close_participant do 0.
+            const tokenCpiCount = logs.filter((line) =>
+              line.includes('Program TokenkegQvGJ78n5JBNy') && /invoke \[\d+\]/.test(line)
+            ).length;
+            if (tokenCpiCount >= 2) {
               claimSig = sigInfo.signature;
               break;
             }

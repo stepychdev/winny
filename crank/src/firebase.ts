@@ -94,15 +94,15 @@ export async function buildHistoryRound(
 }
 
 /**
- * Save round to Firebase RTDB via REST API (PUT).
- * Write-once: will silently ignore 401/403 (already exists per rules).
+ * Save round to Firebase RTDB via REST API (PATCH).
+ * Uses PATCH to merge fields without overwriting client-saved data (e.g. claimTx).
  */
 export async function saveRoundToFirebase(round: HistoryRound): Promise<boolean> {
   if (!dbUrl) return false;
   try {
     const url = `${dbUrl}/rounds/${round.roundId}.json`;
     const res = await fetch(url, {
-      method: "PUT",
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(round),
     });

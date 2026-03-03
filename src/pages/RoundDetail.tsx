@@ -130,6 +130,7 @@ export default function RoundDetail() {
           }
           setArchivedRound(archived);
           setRoundData(null);
+          if (archived.claimTx) setClaimTx(archived.claimTx);
 
           // Build participants from archived data — use per-participant deposits if available
           const archParts: ParticipantDetail[] = [];
