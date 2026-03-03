@@ -147,7 +147,7 @@ mod tests {
             fallback_reason: 0,
             token_index: 123,
             pool_version: 1,
-            candidate_window: 10,
+            candidate_window: 30,
             padding0: [0u8; 7],
             requested_at: 777,
             fulfilled_at: 900,

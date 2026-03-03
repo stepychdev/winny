@@ -32,13 +32,14 @@ impl<'a> TerminalCleanupProcessor<'a> {
         }
 
         if discriminator == instruction_discriminator("close_round") {
-            return handlers::close_round::process_anchor_bytes(
+            handlers::close_round::process_anchor_bytes(
                 self.round_pubkey,
                 self.round_account_data,
                 self.vault_account_data
                     .ok_or(ProgramError::NotEnoughAccountKeys)?,
                 ix_data,
-            );
+            )?;
+            return Ok(());
         }
 
         Err(ProgramError::InvalidInstructionData)

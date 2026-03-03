@@ -33,13 +33,13 @@ import {
   buildFinalizeDegenSuccess,
   createProgram,
 } from "./instructions.js";
-import { DEGEN_POOL, DEGEN_POOL_VERSION } from "./generated/degenPool.js";
 import {
   deriveCandidates,
   isTxTooLargeError,
   isSlippageError,
   parseMaxAccountsSequence,
   parseRoundMeta,
+  parseRoundVrfPayer,
   parseConfigFeeBps,
   computeBeginDegenPayout,
   routeHashFromQuote,
@@ -71,6 +71,10 @@ const DEFAULT_TIMEOUT_MS = 10_000;
 const ONE_SHOT = process.argv.includes("--once");
 const MAX_TX_RAW_BYTES = 1232;
 const JACKPOT_ALT_ADDRESS = (process.env.JACKPOT_ALT || "").trim();
+
+const dynamicPool: readonly string[] | undefined = process.env.DEGEN_POOL_PATH
+  ? JSON.parse(fs.readFileSync(process.env.DEGEN_POOL_PATH, "utf8"))
+  : undefined;
 
 const QUOTE_MAX_ACCOUNTS_SEQUENCE = parseMaxAccountsSequence(
   process.env.DEGEN_EXECUTOR_MAX_ACCOUNTS_SEQUENCE
@@ -245,6 +249,7 @@ async function buildExecutionTx(
   onlyDirectRoutes?: boolean,
   slippageBps?: number,
   jackpotAlt?: AddressLookupTableAccount | null,
+  vrfPayer?: PublicKey | null,
 ): Promise<VersionedTransaction> {
   const winner = claim.account.winner;
   const selectedMint = new PublicKey(candidate.mint);
@@ -310,6 +315,7 @@ async function buildExecutionTx(
     routeHash ?? new Array(32).fill(0),
     selectedMint,
     receiverAta,
+    vrfPayer ?? undefined,
   );
   const finalizeIx = await buildFinalizeDegenSuccess(
     program,
@@ -363,6 +369,7 @@ async function buildExecutionTx(
         routeHashFromQuote(quote),
         selectedMint,
         receiverAta,
+        vrfPayer ?? undefined,
       ),
       ...bodyIxs,
     ];
@@ -422,6 +429,10 @@ async function simulateAndSend(
     commitment: "processed",
   });
   if (simulation.value.err) {
+    if (simulation.value.logs) {
+      console.error("[degen-executor] simulation logs:");
+      for (const line of simulation.value.logs) console.error("  ", line);
+    }
     throw new Error(`simulation failed: ${JSON.stringify(simulation.value.err)}`);
   }
   const sig = await connection.sendTransaction(tx, {
@@ -466,18 +477,16 @@ async function processReadyClaim(
   const round = parseRoundMeta(roundInfo.data);
   if (round.status !== RoundStatus.Settled || round.degenModeStatus !== 2) return;
   if (claim.account.status !== DegenClaimStatus.VrfReady) return;
-  if (claim.account.poolVersion !== DEGEN_POOL_VERSION) {
-    console.warn(`[degen-executor] skip round ${claim.account.roundId.toString()} due to pool version mismatch`);
-    return;
-  }
+
+  // Detect whether the round needs VRF reimbursement
+  const vrfPayer = parseRoundVrfPayer(roundInfo.data);
+  const reimburseVrf = vrfPayer !== null;
 
   // Compute the actual payout that begin_degen_execution will transfer.
-  // The on-chain handler uses reimburse_vrf=false, so we must match that —
-  // NOT claim.account.payoutRaw which was set by VRF callback with reimburse_vrf=true.
   const configInfo = await connection.getAccountInfo(getConfigPda());
   if (!configInfo) { console.warn("[degen-executor] config account not found"); return; }
   const feeBps = parseConfigFeeBps(configInfo.data);
-  const actualPayoutRaw = computeBeginDegenPayout(round.totalUsdc, feeBps);
+  const actualPayoutRaw = computeBeginDegenPayout(round.totalUsdc, feeBps, reimburseVrf);
   if (actualPayoutRaw <= 0n) { console.warn("[degen-executor] computed payout is zero"); return; }
   const vrfPayout = BigInt(claim.account.payoutRaw.toString());
   if (actualPayoutRaw !== vrfPayout) {
@@ -487,7 +496,8 @@ async function processReadyClaim(
   const candidates = await deriveCandidates(
     claim.account.randomness,
     claim.account.poolVersion,
-    claim.account.candidateWindow || 10,
+    claim.account.candidateWindow || 30,
+    dynamicPool,
   );
 
   for (const candidate of candidates) {
@@ -501,6 +511,14 @@ async function processReadyClaim(
         if (!mintOwner || (!mintOwner.equals(TOKEN_PROGRAM_ID) && !mintOwner.equals(TOKEN_2022_PROGRAM_ID))) {
           const ownerLabel = mintOwner?.toBase58() ?? "unknown";
           throw new Error(`unsupported mint program: ${ownerLabel}`);
+        }
+
+        // Pre-check: verify Jupiter has a route before expensive on-chain attempt
+        try {
+          await getQuoteWithMaxAccounts(candidate.mint, actualPayoutRaw.toString());
+        } catch {
+          console.warn(`[degen-executor] candidate rank=${candidate.rank} no Jupiter route, skipping`);
+          continue;
         }
       }
 
@@ -527,6 +545,7 @@ async function processReadyClaim(
             false,
             slipBps,
             jackpotAlt,
+            vrfPayer,
           );
           const sig = await simulateAndSend(connection, tx, executor);
           console.log(
@@ -565,6 +584,8 @@ async function processReadyClaim(
             20,
             true,
             slipBps,
+            jackpotAlt,
+            vrfPayer,
           );
           const sig = await simulateAndSend(connection, tx, executor);
           console.log(
@@ -718,6 +739,9 @@ async function main(): Promise<void> {
   const program = createProgram(connection, executor);
 
   console.log(`[degen-executor] executor=${executor.publicKey.toBase58()} poll_ms=${POLL_MS} one_shot=${ONE_SHOT}`);
+  if (dynamicPool) {
+    console.log(`[degen-executor] loaded dynamic pool from ${process.env.DEGEN_POOL_PATH} (${dynamicPool.length} mints)`);
+  }
 
   // Load Jackpot ALT (optional — tx works without it but may be too large for complex routes)
   let jackpotAlt: AddressLookupTableAccount | null = null;

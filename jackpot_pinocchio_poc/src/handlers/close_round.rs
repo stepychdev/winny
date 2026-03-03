@@ -14,7 +14,7 @@ pub fn process_anchor_bytes(
     round_account_data: &[u8],
     vault_account_data: &[u8],
     ix_data: &[u8],
-) -> Result<(), ProgramError> {
+) -> Result<u64, ProgramError> {
     let _round_id = parse_round_id_ix(ix_data, "close_round")
         .map_err(|_| ProgramError::InvalidInstructionData)?;
 
@@ -29,15 +29,12 @@ pub fn process_anchor_bytes(
         return Err(JackpotCompatError::RoundNotCloseable.into());
     }
 
-    if vault.amount != 0 {
-        return Err(JackpotCompatError::VaultNotEmpty.into());
-    }
-
     if vault.owner != round_pubkey {
         return Err(JackpotCompatError::InvalidVault.into());
     }
 
-    Ok(())
+    // Return dust amount so runtime can sweep it to recipient before closing
+    Ok(vault.amount)
 }
 
 #[cfg(test)]
@@ -108,7 +105,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_non_empty_vault() {
+    fn returns_dust_amount_for_non_empty_vault() {
         let round_id = 81u64;
         let round_pubkey = [4u8; 32];
         let round_data = sample_round(round_id, ROUND_STATUS_CLAIMED);
@@ -118,8 +115,8 @@ mod tests {
         ix.extend_from_slice(&instruction_discriminator("close_round"));
         ix.extend_from_slice(&round_id.to_le_bytes());
 
-        let err = process_anchor_bytes(round_pubkey, &round_data, &vault_data, &ix).unwrap_err();
-        assert_eq!(err, JackpotCompatError::VaultNotEmpty.into());
+        let dust = process_anchor_bytes(round_pubkey, &round_data, &vault_data, &ix).unwrap();
+        assert_eq!(dust, 1);
     }
 
     #[test]

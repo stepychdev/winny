@@ -144,7 +144,6 @@ mod tests {
     use super::*;
     use crate::{
         anchor_compat::{account_discriminator, instruction_discriminator},
-        degen_pool_compat::{degen_token_mint_by_index, derive_degen_candidate_index_at_rank},
         legacy_layouts::{
             ConfigView, DegenClaimView, DegenConfigView, RoundLifecycleView, TokenAccountWithAmountView,
             CONFIG_ACCOUNT_LEN, DEGEN_CLAIM_ACCOUNT_LEN, DEGEN_CONFIG_ACCOUNT_LEN,
@@ -224,7 +223,7 @@ mod tests {
             fallback_reason: 0,
             token_index: 0,
             pool_version: 1,
-            candidate_window: 10,
+            candidate_window: 30,
             padding0: [0u8; 7],
             requested_at: 777,
             fulfilled_at: 900,
@@ -303,8 +302,8 @@ mod tests {
         let config = sample_config();
         let degen_config = sample_degen_config();
         let mut round = sample_round(DEGEN_MODE_VRF_READY);
-        let token_index = derive_degen_candidate_index_at_rank(&[7u8; 32], 1, 0);
-        let token_mint = degen_token_mint_by_index(token_index).unwrap();
+        let token_index = 42u32;
+        let token_mint = [11u8; 32];
         let mut degen_claim = sample_degen_claim(DEGEN_CLAIM_STATUS_VRF_READY, [0u8; 32], [0u8; 32]);
         let vault = token_account([2u8; 32], [8u8; 32], 1_000_000);
         let executor_ata = token_account([2u8; 32], [5u8; 32], 0);

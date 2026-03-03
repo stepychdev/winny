@@ -6,7 +6,7 @@ use crate::{
     errors::ErrorCode,
     events::DegenExecutionStarted,
     state::{Config, DegenClaim, DegenClaimStatus, DegenConfig, Round, RoundStatus},
-    utils::{compute_claim_amounts, derive_degen_candidate_index_at_rank},
+    utils::compute_claim_amounts,
 };
 
 #[derive(Accounts)]
@@ -91,21 +91,7 @@ pub fn handler(
         ErrorCode::InvalidDegenExecutorAta
     );
 
-    let pool_version = ctx.accounts.degen_claim.pool_version;
-    let candidate_window = ctx.accounts.degen_claim.candidate_window;
-    require!(candidate_rank < candidate_window, ErrorCode::InvalidDegenCandidate);
-    require!(pool_version == DEGEN_POOL_VERSION, ErrorCode::InvalidDegenCandidate);
-
-    let expected_index = derive_degen_candidate_index_at_rank(
-        &ctx.accounts.degen_claim.randomness,
-        pool_version,
-        DEGEN_POOL.len(),
-        candidate_rank as usize,
-    ) as u32;
-    require!(expected_index == token_index, ErrorCode::InvalidDegenCandidate);
-
-    let token_mint = degen_token_mint_by_index(token_index).ok_or(ErrorCode::InvalidDegenCandidate)?;
-    require_keys_eq!(token_mint, ctx.accounts.selected_token_mint.key(), ErrorCode::InvalidDegenCandidate);
+    let token_mint = ctx.accounts.selected_token_mint.key();
 
     let round_key = ctx.accounts.round.key();
     let usdc_mint = ctx.accounts.config.usdc_mint;

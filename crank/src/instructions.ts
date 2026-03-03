@@ -276,7 +276,7 @@ export async function buildCloseRound(
   const roundPda = getRoundPda(roundId);
   const vaultAta = await getAssociatedTokenAddress(USDC_MINT, roundPda, true);
 
-  return await (program.methods as any)
+  const baseIx = await (program.methods as any)
     .closeRound(new BN(roundId))
     .accounts({
       payer,
@@ -286,7 +286,16 @@ export async function buildCloseRound(
       tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
     })
-    .instruction();
+    .instruction() as TransactionInstruction;
+
+  // Always append treasury USDC ATA so the program can sweep dust if any
+  baseIx.keys.push({
+    pubkey: TREASURY_USDC_ATA,
+    isSigner: false,
+    isWritable: true,
+  });
+
+  return baseIx;
 }
 
 export async function buildCloseParticipant(
@@ -318,13 +327,15 @@ export async function buildBeginDegenExecution(
   minOutRaw: BN,
   routeHash: number[],
   selectedTokenMint: PublicKey,
-  receiverTokenAta: PublicKey
+  receiverTokenAta: PublicKey,
+  vrfPayer?: PublicKey,
 ): Promise<TransactionInstruction> {
   const roundPda = getRoundPda(roundId);
   const vaultAta = await getAssociatedTokenAddress(USDC_MINT, roundPda, true);
   const executorAta = await getAssociatedTokenAddress(USDC_MINT, executor);
 
-  return await (program.methods as any)
+  // Build base instruction via Anchor methods
+  const baseIx = await (program.methods as any)
     .beginDegenExecution(
       new BN(roundId),
       candidateRank,
@@ -345,7 +356,31 @@ export async function buildBeginDegenExecution(
       receiverTokenAta,
       tokenProgram: TOKEN_PROGRAM_ID,
     })
-    .instruction();
+    .instruction() as TransactionInstruction;
+
+  // If round has a vrf_payer that needs reimbursement, splice in the two
+  // extra accounts (vrfPayerAuthority + vrfPayerUsdcAta) between
+  // treasuryUsdcAta and selectedTokenMint — the Pinocchio runtime
+  // expects 13 accounts in that case.
+  if (vrfPayer && !vrfPayer.equals(PublicKey.default)) {
+    const vrfPayerUsdcAta = await getAssociatedTokenAddress(USDC_MINT, vrfPayer);
+    // IDL produces 11 keys: [executor, config, degenConfig, round, degenClaim,
+    //   vault, executorAta, treasuryAta, selectedMint, receiverAta, tokenProgram]
+    // We need to insert vrfPayerAuthority(writable) + vrfPayerUsdcAta(writable)
+    // at index 8 (after treasuryAta).
+    const keys = [...baseIx.keys];
+    keys.splice(8, 0,
+      { pubkey: vrfPayer, isSigner: false, isWritable: true },
+      { pubkey: vrfPayerUsdcAta, isSigner: false, isWritable: true },
+    );
+    return new TransactionInstruction({
+      programId: baseIx.programId,
+      keys,
+      data: baseIx.data,
+    });
+  }
+
+  return baseIx;
 }
 
 export async function buildFinalizeDegenSuccess(

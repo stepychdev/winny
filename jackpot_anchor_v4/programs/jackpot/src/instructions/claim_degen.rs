@@ -6,7 +6,6 @@ use crate::{
     errors::ErrorCode,
     events::DegenClaimed,
     state::{Config, DegenClaim, DegenClaimStatus, Round, RoundStatus},
-    utils::derive_degen_candidate_index_at_rank,
 };
 
 #[derive(Accounts)]
@@ -69,24 +68,7 @@ pub fn handler(
     let round_key = ctx.accounts.round.key();
     let usdc_mint = cfg.usdc_mint;
 
-    let pool_version = ctx.accounts.degen_claim.pool_version();
-    let candidate_window = ctx.accounts.degen_claim.candidate_window();
-    require!(candidate_rank < candidate_window, ErrorCode::InvalidDegenCandidate);
-    require!(
-        pool_version == DEGEN_POOL_VERSION,
-        ErrorCode::InvalidDegenCandidate
-    );
-
-    let expected_index = derive_degen_candidate_index_at_rank(
-        &ctx.accounts.degen_claim.randomness,
-        pool_version,
-        DEGEN_POOL.len(),
-        candidate_rank as usize,
-    ) as u32;
-    require!(expected_index == token_index, ErrorCode::InvalidDegenCandidate);
-
-    let token_mint =
-        degen_token_mint_by_index(token_index).ok_or(ErrorCode::InvalidDegenCandidate)?;
+    let token_mint = Pubkey::default(); // informational — claim_degen transfers USDC only
 
     let (fee, payout, vrf_reimburse, round_bump, winner_bytes) = {
         let round = ctx.accounts.round.load()?;

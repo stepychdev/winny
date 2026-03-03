@@ -1,7 +1,6 @@
 use pinocchio::error::ProgramError;
 
 use crate::{
-    degen_pool_compat::{degen_token_mint_by_index, derive_degen_candidate_index_at_rank, pool_version},
     errors::JackpotCompatError,
     handlers::degen_common::{ClaimAmountsCompat, compute_claim_amounts, map_layout_err},
     instruction_layouts::BeginDegenExecutionArgsCompat,
@@ -53,25 +52,6 @@ pub fn process_anchor_bytes(
     }
     if executor_usdc_ata.owner != executor_pubkey || executor_usdc_ata.mint != config.usdc_mint || executor_usdc_ata.amount != 0 {
         return Err(JackpotCompatError::InvalidDegenExecutorAta.into());
-    }
-    if args.candidate_rank >= degen_claim.candidate_window {
-        return Err(JackpotCompatError::InvalidDegenCandidate.into());
-    }
-    if degen_claim.pool_version != pool_version() {
-        return Err(JackpotCompatError::InvalidDegenCandidate.into());
-    }
-    let expected_index = derive_degen_candidate_index_at_rank(
-        &degen_claim.randomness,
-        degen_claim.pool_version,
-        args.candidate_rank as usize,
-    );
-    if expected_index != args.token_index {
-        return Err(JackpotCompatError::InvalidDegenCandidate.into());
-    }
-    let expected_token_mint =
-        degen_token_mint_by_index(args.token_index).ok_or::<ProgramError>(JackpotCompatError::InvalidDegenCandidate.into())?;
-    if selected_token_mint_pubkey != expected_token_mint {
-        return Err(JackpotCompatError::InvalidDegenCandidate.into());
     }
     if round.round_id != args.round_id {
         return Err(ProgramError::InvalidInstructionData);
@@ -133,7 +113,7 @@ pub fn process_anchor_bytes(
     degen_claim.selected_candidate_rank = args.candidate_rank;
     degen_claim.fallback_reason = DEGEN_FALLBACK_REASON_NONE;
     degen_claim.token_index = args.token_index;
-    degen_claim.token_mint = expected_token_mint;
+    degen_claim.token_mint = selected_token_mint_pubkey;
     degen_claim.executor = executor_pubkey;
     degen_claim.receiver_token_ata = receiver_token_ata_pubkey;
     degen_claim.receiver_pre_balance = receiver_token_ata.amount;
@@ -152,7 +132,6 @@ mod tests {
     use super::*;
     use crate::{
         anchor_compat::{account_discriminator, instruction_discriminator},
-        degen_pool_compat::{degen_token_mint_by_index, derive_degen_candidate_index_at_rank},
         legacy_layouts::{
             ConfigView, DegenClaimView, DegenConfigView, RoundLifecycleView, TokenAccountWithAmountView,
             CONFIG_ACCOUNT_LEN, DEGEN_CLAIM_ACCOUNT_LEN, DEGEN_CONFIG_ACCOUNT_LEN, ROUND_ACCOUNT_LEN,
@@ -176,8 +155,8 @@ mod tests {
         let treasury = [3u8; 32];
         let receiver_token_ata = [12u8; 32];
         let usdc_mint = [2u8; 32];
-        let token_index = derive_degen_candidate_index_at_rank(&[7u8; 32], 1, 0);
-        let selected_token_mint = degen_token_mint_by_index(token_index).unwrap();
+        let token_index = 42u32;
+        let selected_token_mint = [11u8; 32];
 
         let mut config = [0u8; CONFIG_ACCOUNT_LEN];
         config[..8].copy_from_slice(&account_discriminator("Config"));
@@ -240,7 +219,7 @@ mod tests {
             fallback_reason: 0,
             token_index: 0,
             pool_version: 1,
-            candidate_window: 10,
+            candidate_window: 30,
             padding0: [0u8; 7],
             requested_at: 777,
             fulfilled_at: 900,

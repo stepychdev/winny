@@ -1,7 +1,6 @@
 use pinocchio::error::ProgramError;
 
 use crate::{
-    degen_pool_compat::{degen_token_mint_by_index, derive_degen_candidate_index_at_rank, pool_version},
     errors::JackpotCompatError,
     instruction_layouts::ClaimDegenArgsCompat,
     legacy_layouts::{
@@ -50,24 +49,6 @@ pub fn process_anchor_bytes(
     if degen_claim.status != DEGEN_CLAIM_STATUS_VRF_READY {
         return Err(JackpotCompatError::DegenVrfNotReady.into());
     }
-    if args.candidate_rank >= degen_claim.candidate_window {
-        return Err(JackpotCompatError::InvalidDegenCandidate.into());
-    }
-    if degen_claim.pool_version != pool_version() {
-        return Err(JackpotCompatError::InvalidDegenCandidate.into());
-    }
-
-    let expected_index = derive_degen_candidate_index_at_rank(
-        &degen_claim.randomness,
-        degen_claim.pool_version,
-        args.candidate_rank as usize,
-    );
-    if expected_index != args.token_index {
-        return Err(JackpotCompatError::InvalidDegenCandidate.into());
-    }
-
-    let token_mint = degen_token_mint_by_index(args.token_index)
-        .ok_or::<ProgramError>(JackpotCompatError::InvalidDegenCandidate.into())?;
 
     // --- Round / winner validation ---
     if round.status != ROUND_STATUS_SETTLED {
@@ -167,7 +148,7 @@ pub fn process_anchor_bytes(
     degen_claim.selected_candidate_rank = args.candidate_rank;
     degen_claim.fallback_reason = DEGEN_FALLBACK_REASON_NONE;
     degen_claim.token_index = args.token_index;
-    degen_claim.token_mint = token_mint;
+    degen_claim.token_mint = [0u8; 32];
     degen_claim.executor = [0u8; 32];
     degen_claim.receiver_token_ata = [0u8; 32];
     degen_claim.receiver_pre_balance = 0;
@@ -186,7 +167,6 @@ mod tests {
     use super::*;
     use crate::{
         anchor_compat::{account_discriminator, instruction_discriminator},
-        degen_pool_compat::{degen_token_mint_by_index, derive_degen_candidate_index_at_rank},
         legacy_layouts::{
             ConfigView, DegenClaimView, RoundLifecycleView, CONFIG_ACCOUNT_LEN,
             DEGEN_CLAIM_ACCOUNT_LEN, ROUND_ACCOUNT_LEN, TOKEN_ACCOUNT_CORE_LEN,
@@ -256,7 +236,7 @@ mod tests {
             fallback_reason: 0,
             token_index: 0,
             pool_version: 1,
-            candidate_window: 10,
+            candidate_window: 30,
             padding0: [0u8; 7],
             requested_at: 777,
             fulfilled_at: 900,
@@ -302,7 +282,7 @@ mod tests {
         let winner_usdc_ata = token_account([2u8; 32], [9u8; 32]);
         let treasury_usdc_ata = token_account([2u8; 32], [7u8; 32]);
 
-        let token_index = derive_degen_candidate_index_at_rank(&[7u8; 32], 1, 0);
+        let token_index = 42u32;
         let ix = build_claim_degen_ix(81, 0, token_index);
 
         let amounts = process_anchor_bytes(
@@ -335,7 +315,7 @@ mod tests {
         assert_eq!(claim.token_index, token_index);
         assert_eq!(claim.selected_candidate_rank, 0);
         assert_eq!(claim.fallback_reason, DEGEN_FALLBACK_REASON_NONE);
-        assert_eq!(claim.token_mint, degen_token_mint_by_index(token_index).unwrap());
+        assert_eq!(claim.token_mint, [0u8; 32]);
         assert_eq!(claim.payout_raw, 997_500);
         assert_eq!(claim.claimed_at, 1_001);
     }
@@ -350,7 +330,7 @@ mod tests {
         let treasury_usdc_ata = token_account([2u8; 32], [7u8; 32]);
         let vrf_payer_usdc_ata = token_account([2u8; 32], [10u8; 32]);
 
-        let token_index = derive_degen_candidate_index_at_rank(&[7u8; 32], 1, 0);
+        let token_index = 42u32;
         let ix = build_claim_degen_ix(81, 0, token_index);
 
         let amounts = process_anchor_bytes(
@@ -377,73 +357,6 @@ mod tests {
     }
 
     #[test]
-    fn claim_degen_rejects_wrong_candidate_rank() {
-        let config = sample_config();
-        let mut round = sample_round(false);
-        let mut degen_claim = sample_degen_claim();
-        let vault_data = token_account([2u8; 32], [8u8; 32]);
-        let winner_usdc_ata = token_account([2u8; 32], [9u8; 32]);
-        let treasury_usdc_ata = token_account([2u8; 32], [7u8; 32]);
-
-        // candidate_window is 10, so rank 10 is out of bounds
-        let token_index = derive_degen_candidate_index_at_rank(&[7u8; 32], 1, 0);
-        let ix = build_claim_degen_ix(81, 10, token_index);
-
-        let err = process_anchor_bytes(
-            [9u8; 32],
-            [8u8; 32],
-            [8u8; 32],
-            1_001,
-            &config,
-            &mut round,
-            &mut degen_claim,
-            &vault_data,
-            &winner_usdc_ata,
-            [3u8; 32],
-            &treasury_usdc_ata,
-            None,
-            None,
-            &ix,
-        )
-        .unwrap_err();
-
-        assert_eq!(err, JackpotCompatError::InvalidDegenCandidate.into());
-    }
-
-    #[test]
-    fn claim_degen_rejects_wrong_token_index() {
-        let config = sample_config();
-        let mut round = sample_round(false);
-        let mut degen_claim = sample_degen_claim();
-        let vault_data = token_account([2u8; 32], [8u8; 32]);
-        let winner_usdc_ata = token_account([2u8; 32], [9u8; 32]);
-        let treasury_usdc_ata = token_account([2u8; 32], [7u8; 32]);
-
-        // Pass wrong token_index (999 instead of the derived one)
-        let ix = build_claim_degen_ix(81, 0, 999);
-
-        let err = process_anchor_bytes(
-            [9u8; 32],
-            [8u8; 32],
-            [8u8; 32],
-            1_001,
-            &config,
-            &mut round,
-            &mut degen_claim,
-            &vault_data,
-            &winner_usdc_ata,
-            [3u8; 32],
-            &treasury_usdc_ata,
-            None,
-            None,
-            &ix,
-        )
-        .unwrap_err();
-
-        assert_eq!(err, JackpotCompatError::InvalidDegenCandidate.into());
-    }
-
-    #[test]
     fn claim_degen_rejects_non_winner() {
         let config = sample_config();
         let mut round = sample_round(false);
@@ -452,7 +365,7 @@ mod tests {
         let winner_usdc_ata = token_account([2u8; 32], [11u8; 32]);
         let treasury_usdc_ata = token_account([2u8; 32], [7u8; 32]);
 
-        let token_index = derive_degen_candidate_index_at_rank(&[7u8; 32], 1, 0);
+        let token_index = 42u32;
         let ix = build_claim_degen_ix(81, 0, token_index);
 
         let err = process_anchor_bytes(

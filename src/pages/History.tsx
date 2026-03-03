@@ -1,9 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useConnection } from '@solana/wallet-adapter-react';
+import { AnchorProvider } from '@coral-xyz/anchor';
+import { Keypair, PublicKey } from '@solana/web3.js';
 import { Header } from '../components/Header';
 import { useRoundHistory } from '../hooks/useRoundHistory';
 import { useNavigation } from '../contexts/NavigationContext';
-import { PROGRAM_ID, RoundStatus, SOLSCAN_CLUSTER_QUERY } from '../lib/constants';
+import { PROGRAM_ID, RoundStatus, DegenModeStatus, SOLSCAN_CLUSTER_QUERY } from '../lib/constants';
+import { getProgram, fetchDegenClaim } from '../lib/program';
+import { fetchDegenTokenMeta } from '../lib/degenClaim';
+import { fetchTokenLogoViaJupiter } from '../lib/tokenMetadata';
 import {
   Users,
   Loader2,
@@ -42,6 +47,19 @@ export default function History() {
   const [searchQuery, setSearchQuery] = useState('');
   const [resolvedClaimTx, setResolvedClaimTx] = useState<Record<number, string>>({});
   const [unresolvedClaimRounds, setUnresolvedClaimRounds] = useState<Record<number, true>>({});
+  const [degenTokens, setDegenTokens] = useState<Record<number, { symbol: string; logoUrl?: string; mint?: string; fallback?: boolean }>>({});
+  const [degenChecked, setDegenChecked] = useState<Record<number, true>>({});
+
+  // Read-only Anchor program for degen claim lookups
+  const program = useMemo(() => {
+    const kp = Keypair.generate();
+    const provider = new AnchorProvider(
+      connection,
+      { publicKey: kp.publicKey, signTransaction: async (t: any) => t, signAllTransactions: async (t: any) => t } as any,
+      { commitment: 'confirmed' },
+    );
+    return getProgram(provider);
+  }, [connection]);
 
   const buildTxUrl = (signature: string) => `https://solscan.io/tx/${signature}${SOLSCAN_CLUSTER_QUERY}`;
 
@@ -136,6 +154,59 @@ export default function History() {
       disposed = true;
     };
   }, [connection, rounds, resolvedClaimTx, unresolvedClaimRounds]);
+
+  // Resolve degen token info for claimed rounds
+  useEffect(() => {
+    let disposed = false;
+    const claimedRounds = rounds.filter(
+      (r) => r.status === RoundStatus.Claimed && !degenTokens[r.roundId] && !degenChecked[r.roundId]
+    );
+    if (claimedRounds.length === 0) return;
+
+    (async () => {
+      const found: typeof degenTokens = {};
+      const checked: number[] = [];
+
+      for (const r of claimedRounds) {
+        if (disposed) break;
+        checked.push(r.roundId);
+        try {
+          const winnerKey = new PublicKey(r.winner);
+          if (winnerKey.equals(PublicKey.default)) continue;
+          const degen = await fetchDegenClaim(program, r.roundId, winnerKey);
+          if (!degen) continue;
+
+          if (degen.status === DegenModeStatus.ClaimedSwapped) {
+            const mintStr = degen.tokenMint.equals(PublicKey.default) ? null : degen.tokenMint.toBase58();
+            if (mintStr) {
+              const meta = await fetchDegenTokenMeta(mintStr);
+              let logoUrl = '';
+              try { logoUrl = await fetchTokenLogoViaJupiter(mintStr); } catch {}
+              found[r.roundId] = { symbol: meta.symbol, mint: mintStr, logoUrl: logoUrl || undefined };
+            }
+          } else if (degen.status === DegenModeStatus.ClaimedFallback) {
+            found[r.roundId] = { symbol: 'USDC', fallback: true };
+          }
+        } catch {
+          // No degen claim PDA — normal USDC claim
+        }
+      }
+
+      if (disposed) return;
+      if (Object.keys(found).length > 0) {
+        setDegenTokens((prev) => ({ ...prev, ...found }));
+      }
+      if (checked.length > 0) {
+        setDegenChecked((prev) => {
+          const next = { ...prev };
+          for (const id of checked) next[id] = true;
+          return next;
+        });
+      }
+    })();
+
+    return () => { disposed = true; };
+  }, [rounds, program, degenTokens, degenChecked]);
 
   const filtered = rounds.filter((r) => {
     if (searchQuery) {
@@ -332,20 +403,47 @@ export default function History() {
                             </td>
                             <td className="whitespace-nowrap px-6 py-4 text-sm">
                               {r.status === RoundStatus.Claimed ? (
-                                claimTx ? (
-                                  <a
-                                    href={buildTxUrl(claimTx)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="inline-flex items-center gap-1 text-xs font-medium text-green-600 dark:text-green-400 hover:underline"
-                                  >
-                                    <ExternalLink className="w-3 h-3" />
-                                    View TX
-                                  </a>
-                                ) : (
-                                  <span className="text-xs text-slate-400">TX pending</span>
-                                )
+                                <div className="flex items-center gap-2">
+                                  {/* Degen token badge */}
+                                  {degenTokens[r.roundId] && !degenTokens[r.roundId].fallback && (
+                                    <div className="flex items-center gap-1.5">
+                                      {degenTokens[r.roundId].logoUrl ? (
+                                        <img
+                                          src={degenTokens[r.roundId].logoUrl}
+                                          alt={degenTokens[r.roundId].symbol}
+                                          className="w-5 h-5 rounded-full ring-1 ring-purple-400/30"
+                                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                        />
+                                      ) : (
+                                        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white text-[8px] font-black">
+                                          {degenTokens[r.roundId].symbol.slice(0, 2)}
+                                        </div>
+                                      )}
+                                      <span className="text-xs font-semibold text-purple-600 dark:text-purple-400">
+                                        {degenTokens[r.roundId].symbol}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {degenTokens[r.roundId]?.fallback && (
+                                    <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded">
+                                      Fallback
+                                    </span>
+                                  )}
+                                  {claimTx ? (
+                                    <a
+                                      href={buildTxUrl(claimTx)}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="inline-flex items-center gap-1 text-xs font-medium text-green-600 dark:text-green-400 hover:underline"
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                      View TX
+                                    </a>
+                                  ) : (
+                                    <span className="text-xs text-slate-400">TX pending</span>
+                                  )}
+                                </div>
                               ) : r.status === RoundStatus.Settled ? (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); navigateToRound(r.roundId); }}

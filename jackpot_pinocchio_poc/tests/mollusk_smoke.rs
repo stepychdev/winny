@@ -368,10 +368,8 @@ fn begin_degen_execution_instruction_succeeds_in_mollusk() {
         &[b"degen_claim", &round_id.to_le_bytes(), winner.as_ref()],
         &program_id,
     );
-    let token_mint = Pubkey::new_from_array(jackpot_pinocchio_poc::degen_pool_compat::degen_token_mint_by_index(
-        jackpot_pinocchio_poc::degen_pool_compat::derive_degen_candidate_index_at_rank(&[7u8; 32], 1, 0),
-    ).expect("live degen mint"));
-    let token_index = jackpot_pinocchio_poc::degen_pool_compat::derive_degen_candidate_index_at_rank(&[7u8; 32], 1, 0);
+    let token_mint = Pubkey::new_from_array([11u8; 32]);
+    let token_index = 42u32;
     let receiver_token_ata = Pubkey::new_unique();
     let vault_ata = Pubkey::new_unique();
     let executor_usdc_ata = Pubkey::new_unique();
@@ -860,7 +858,7 @@ fn degen_claim_vrf_ready_account(
         fallback_reason: 0,
         token_index: 0,
         pool_version: 1,
-        candidate_window: 10,
+        candidate_window: 30,
         padding0: [0u8; 7],
         requested_at: 777,
         fulfilled_at: 900,
@@ -945,7 +943,7 @@ fn degen_claim_account(
         fallback_reason: 0,
         token_index: 123,
         pool_version: 1,
-        candidate_window: 10,
+        candidate_window: 30,
         padding0: [0u8; 7],
         requested_at: 777,
         fulfilled_at: 900,

@@ -4,10 +4,22 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-const ROOT = "/home/scumcheck/jackpot/xyzcasino";
+const ROOT = path.resolve(import.meta.dirname, "..");
 const API_URL = "https://api.jup.ag/tokens/v2/tag?query=verified";
 const API_KEY = (process.env.JUP_API_KEY || "").trim();
 const POOL_VERSION = Number.parseInt(process.env.DEGEN_POOL_VERSION || "1", 10);
+
+// Liquidity & volume thresholds — tokens below these are likely dead / untradable
+const MIN_LIQUIDITY_USD = Number(process.env.DEGEN_MIN_LIQUIDITY || 10_000);
+const MIN_24H_VOLUME_USD = Number(process.env.DEGEN_MIN_VOLUME_24H || 1_000);
+
+// Exclude stablecoins — no point swapping USDC → USDC-like
+const STABLECOIN_MINTS = new Set([
+  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
+  "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", // USDT
+  "USDSwr9ApdHk5bvJKMjzff41FfuX8bSxdKcR81vTwcA",  // USDS
+  "2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo", // PYUSD
+]);
 
 if (!API_KEY) {
   console.error("Missing JUP_API_KEY");
@@ -72,14 +84,32 @@ async function fetchVerified() {
 
   const payload = await response.json();
   const rows = Array.isArray(payload) ? payload : payload.tokens ?? [];
-  return rows
-    .map((row) => ({
-      mint: row.id || row.address || row.mint,
-      symbol: row.symbol || null,
-      name: row.name || null,
-      logoURI: row.logoURI || row.icon || null,
-    }))
-    .filter((row) => typeof row.mint === "string" && row.mint.length > 0);
+  let freezeFiltered = 0;
+  const filtered = rows.filter((row) => {
+    const mint = row.id || row.address || row.mint;
+    if (typeof mint !== "string" || mint.length === 0) return false;
+    if (STABLECOIN_MINTS.has(mint)) return false;
+
+    // Reject tokens with active freeze authority — classic scam vector
+    if (row.audit?.freezeAuthorityDisabled === false) {
+      freezeFiltered++;
+      return false;
+    }
+
+    const liquidity = Number(row.liquidity) || 0;
+    const volume24h =
+      (Number(row.stats24h?.buyVolume) || 0) +
+      (Number(row.stats24h?.sellVolume) || 0);
+
+    return liquidity >= MIN_LIQUIDITY_USD && volume24h >= MIN_24H_VOLUME_USD;
+  }).map((row) => ({
+    mint: row.id || row.address || row.mint,
+    symbol: row.symbol || null,
+    name: row.name || null,
+    logoURI: row.logoURI || row.icon || null,
+  }));
+  console.error(`[filter] Excluded ${freezeFiltered} tokens with active freeze authority`);
+  return filtered;
 }
 
 function normalizeTokens(rows) {
@@ -101,9 +131,11 @@ async function main() {
 
   const manifest = {
     poolVersion: POOL_VERSION,
-    source: "jupiter-verified",
+    source: "jupiter-verified-tradable",
     generatedAt,
     tokenCount: tokens.length,
+    minLiquidity: MIN_LIQUIDITY_USD,
+    minVolume24h: MIN_24H_VOLUME_USD,
     snapshotSha256,
     tokens,
   };
@@ -121,7 +153,7 @@ async function main() {
     "export type DegenPoolMint = (typeof DEGEN_POOL)[number];",
     "",
   ].join("\n");
-  writeFile(path.join(ROOT, "src/generated/degenPool.ts"), tsFile);
+  writeFile(path.join(ROOT, "crank/src/generated/degenPool.ts"), tsFile);
 
   const rustFile = [
     `pub const DEGEN_POOL_VERSION: u32 = ${POOL_VERSION};`,
@@ -142,6 +174,8 @@ async function main() {
         ok: true,
         poolVersion: POOL_VERSION,
         tokenCount: tokens.length,
+        filtered: `liquidity >= $${MIN_LIQUIDITY_USD}, 24h volume >= $${MIN_24H_VOLUME_USD}, freezeAuthority=disabled`,
+        safeguards: "freezeAuthorityDisabled=true required",
         snapshotSha256,
       },
       null,

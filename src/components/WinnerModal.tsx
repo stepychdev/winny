@@ -53,6 +53,7 @@ export function WinnerModal({
   const [degenToken, setDegenToken] = useState<RevealedDegenToken | null>(null);
   const [degenSwapping, setDegenSwapping] = useState(false);
   const [degenStatus, setDegenStatus] = useState<string | null>(null);
+  const [degenElapsed, setDegenElapsed] = useState(0);
   const canClaim = !!isWinner && (!!onClaim || !!onClaimDegen);
   const { profile: winnerSocialProfile } = useTapestryProfile(winner?.address ?? null);
   const { navigateToPlayer } = useNavigation();
@@ -63,6 +64,20 @@ export function WinnerModal({
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    if (!degenSwapping) { setDegenElapsed(0); return; }
+    const interval = setInterval(() => setDegenElapsed(e => e + 1), 1000);
+    return () => clearInterval(interval);
+  }, [degenSwapping]);
+
+  const dynamicDegenStatus = degenSwapping
+    ? degenElapsed < 5 ? 'Sending VRF request...'
+      : degenElapsed < 15 ? 'Waiting for VRF randomness...'
+      : degenElapsed < 30 ? 'Executor finding best swap route...'
+      : degenElapsed < 60 ? 'Swapping via Jupiter... (this can take a moment)'
+      : 'Still processing... hang tight!'
+    : degenStatus;
 
   const activateDegenMode = useCallback(() => {
     setDegenMode(true);
@@ -75,7 +90,7 @@ export function WinnerModal({
 
     try {
       setDegenSwapping(true);
-      setDegenStatus('Requesting degen VRF and handing execution to the protocol executor...');
+      setDegenStatus(null);
       const result = await onClaimDegen();
 
       if (result.fallback) {
@@ -202,13 +217,47 @@ export function WinnerModal({
 
           <div className="w-full bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-8 mb-8 border border-slate-100 dark:border-slate-700/50">
             <p className="text-slate-500 dark:text-slate-400 font-semibold text-xs uppercase tracking-[0.2em] mb-2">
-              Total Payout
+              {degenToken ? 'Received' : 'Total Payout'}
             </p>
             <div className="flex flex-col items-center">
-              <span className="text-4xl sm:text-6xl font-black text-amber-500 drop-shadow-sm">
-                ${winner.payout.toFixed(2)}
-              </span>
-              <span className="text-amber-600 dark:text-amber-400 font-bold text-lg mt-1">USDC</span>
+              {degenToken ? (
+                <>
+                  <div className="flex items-center gap-3 mb-1">
+                    {degenToken.logoUrl ? (
+                      <img
+                        src={degenToken.logoUrl}
+                        alt={degenToken.symbol}
+                        className="w-12 h-12 rounded-full ring-2 ring-purple-400/30 shadow-lg"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white text-lg font-black shadow-lg">
+                        {degenToken.symbol.slice(0, 2)}
+                      </div>
+                    )}
+                    <span className="text-3xl sm:text-5xl font-black text-purple-500 drop-shadow-sm">
+                      {degenToken.symbol}
+                    </span>
+                  </div>
+                  <span className="text-sm text-slate-500 dark:text-slate-400 font-mono">
+                    ${winner.payout.toFixed(2)} USDC → {degenToken.symbol}
+                  </span>
+                </>
+              ) : degenStatus?.includes('Fallback') || degenStatus?.includes('USDC') ? (
+                <>
+                  <span className="text-4xl sm:text-6xl font-black text-amber-500 drop-shadow-sm">
+                    ${winner.payout.toFixed(2)}
+                  </span>
+                  <span className="text-amber-600 dark:text-amber-400 font-bold text-lg mt-1">USDC (degen fallback)</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-4xl sm:text-6xl font-black text-amber-500 drop-shadow-sm">
+                    ${winner.payout.toFixed(2)}
+                  </span>
+                  <span className="text-amber-600 dark:text-amber-400 font-bold text-lg mt-1">USDC</span>
+                </>
+              )}
             </div>
             <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700 flex justify-between text-xs font-medium text-slate-400 dark:text-slate-500">
               <div className="flex items-center gap-1.5">
@@ -287,9 +336,9 @@ export function WinnerModal({
               </div>
             )}
 
-            {degenStatus && (
+            {(dynamicDegenStatus) && (
               <div className="text-xs text-center font-mono text-purple-400 animate-pulse px-2">
-                {degenStatus}
+                {dynamicDegenStatus}
               </div>
             )}
 

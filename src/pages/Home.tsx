@@ -490,14 +490,9 @@ export function Home() {
         }}
         onClaimDegen={async () => {
           const result = await jackpot.claimDegen();
-          // Auto-close modal after a brief delay so user sees the result
-          setTimeout(() => {
-            setShowWinnerModal(false);
-            setWinnerSnapshot(null);
-            jackpot.setPauseAutoAdvance(false);
-            setDismissedWinnerRound(jackpot.roundId);
-            jackpot.nextRound();
-          }, 3000);
+          // Don't auto-close — let the user see the degen result and close manually.
+          // If executor is still processing (pending), the modal stays open so the user
+          // can see the final token once it lands.
           return result;
         }}
         degenSeed={winnerSnapshot?.degenSeed ?? null}

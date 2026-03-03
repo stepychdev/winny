@@ -126,3 +126,7 @@ crank/*keypair*.json
 
 # Devnet test keypairs
 jackpot_pinocchio_poc/devnet-keys/*.json
+degen-executor-keypair.json
+deployer_keypair.json
+deployer_keypair*.json
+degen-pool-raydium-top100.json

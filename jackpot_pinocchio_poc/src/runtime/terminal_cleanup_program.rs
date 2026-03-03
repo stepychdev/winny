@@ -7,6 +7,8 @@ use pinocchio::{
 use pinocchio::cpi::{Seed, Signer};
 #[cfg(not(test))]
 use pinocchio_token::instructions::CloseAccount as TokenCloseAccount;
+#[cfg(not(test))]
+use pinocchio_token::instructions::Transfer as TokenTransfer;
 
 use crate::{
     anchor_compat::{account_discriminator, instruction_discriminator},
@@ -79,8 +81,14 @@ fn process_close_round(
     accounts: &[AccountView],
     instruction_data: &[u8],
 ) -> ProgramResult {
-    let [payer, recipient, round, vault, token_program, system_program, ..] = accounts else {
-        return Err(ProgramError::NotEnoughAccountKeys);
+    let (payer, recipient, round, vault, token_program, system_program, treasury_usdc_ata) = match accounts {
+        [payer, recipient, round, vault, token_program, system_program, treasury_usdc_ata, ..] => {
+            (payer, recipient, round, vault, token_program, system_program, Some(treasury_usdc_ata))
+        }
+        [payer, recipient, round, vault, token_program, system_program, ..] => {
+            (payer, recipient, round, vault, token_program, system_program, None)
+        }
+        _ => return Err(ProgramError::NotEnoughAccountKeys),
     };
 
     require_signer(payer)?;
@@ -109,6 +117,13 @@ fn process_close_round(
     };
 
     let round_id_le = round_view.round_id.to_le_bytes();
+
+    // Sweep any dust remaining in the vault to treasury before closing
+    if let Some(treasury) = treasury_usdc_ata {
+        require_writable(treasury)?;
+        sweep_vault_dust(vault, treasury, round, &round_id_le, round_view.bump)?;
+    }
+
     close_empty_vault_token_account(vault, recipient, round, &round_id_le, round_view.bump)?;
     close_zeroed_round_account(round, recipient)?;
 
@@ -137,6 +152,72 @@ fn close_account_to(
         account_to_close.resize(0)?;
     }
 
+    Ok(())
+}
+
+#[cfg(not(test))]
+fn sweep_vault_dust(
+    vault: &AccountView,
+    recipient: &AccountView,
+    round: &AccountView,
+    round_id_le: &[u8; 8],
+    round_bump: u8,
+) -> ProgramResult {
+    let vault_data = vault.try_borrow()?;
+    let dust = crate::legacy_layouts::TokenAccountWithAmountView::read_from_account_data(&vault_data)
+        .map_err(|_| ProgramError::InvalidAccountData)?
+        .amount;
+    drop(vault_data);
+    if dust == 0 {
+        return Ok(());
+    }
+    let round_bump_slice = [round_bump];
+    let signer_seeds: [Seed<'_>; 3] = [
+        Seed::from(SEED_ROUND),
+        Seed::from(round_id_le),
+        Seed::from(&round_bump_slice),
+    ];
+    TokenTransfer {
+        from: vault,
+        to: recipient,
+        authority: round,
+        amount: dust,
+    }
+    .invoke_signed(&[Signer::from(&signer_seeds)])
+}
+
+#[cfg(test)]
+fn sweep_vault_dust(
+    vault: &AccountView,
+    recipient: &AccountView,
+    _round: &AccountView,
+    _round_id_le: &[u8; 8],
+    _round_bump: u8,
+) -> ProgramResult {
+    let vault_data = vault.try_borrow()?;
+    let dust = crate::legacy_layouts::TokenAccountWithAmountView::read_from_account_data(&vault_data)
+        .map_err(|_| ProgramError::InvalidAccountData)?
+        .amount;
+    drop(vault_data);
+    if dust == 0 {
+        return Ok(());
+    }
+    // In test mode, just zero the vault amount and add to recipient
+    {
+        let mut vd = vault.try_borrow_mut()?;
+        crate::legacy_layouts::TokenAccountWithAmountView::write_amount_to_account_data(&mut vd, 0)
+            .map_err(|_| ProgramError::InvalidAccountData)?;
+    }
+    {
+        let rd = recipient.try_borrow()?;
+        let recv_amount = crate::legacy_layouts::TokenAccountWithAmountView::read_from_account_data(&rd)
+            .map_err(|_| ProgramError::InvalidAccountData)?
+            .amount;
+        drop(rd);
+        let mut rd_mut = recipient.try_borrow_mut()?;
+        crate::legacy_layouts::TokenAccountWithAmountView::write_amount_to_account_data(&mut rd_mut, recv_amount + dust)
+            .map_err(|_| ProgramError::InvalidAccountData)?;
+    }
     Ok(())
 }
 

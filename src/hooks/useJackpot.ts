@@ -1354,57 +1354,58 @@ export function useJackpot(): JackpotState {
           requestSig = await sendTransaction(reqTx, connection, { skipPreflight: true });
         }
 
-        // Brief delay to let tx land before polling state
-        await new Promise(r => setTimeout(r, 2000));
-        const degen = await fetchDegenClaim(program, roundId, publicKey);
-        if (!degen) {
-          throw new Error("Degen VRF request was sent, but claim state is not available yet.");
+        // Poll until terminal state (ClaimedSwapped / ClaimedFallback) or timeout
+        const POLL_INTERVAL = 3000;
+        const MAX_POLL_TIME = 90_000;
+        const startTime = Date.now();
+
+        while (Date.now() - startTime < MAX_POLL_TIME) {
+          await new Promise(r => setTimeout(r, POLL_INTERVAL));
+          const degen = await fetchDegenClaim(program, roundId, publicKey);
+          if (!degen) continue;
+
+          if (degen.status === DegenModeStatus.ClaimedFallback) {
+            await pollRound();
+            await pollBalance();
+            return {
+              claimSig: requestSig,
+              tokenMint: null,
+              tokenIndex: null,
+              tokenSymbol: null,
+              fallback: true,
+            };
+          }
+
+          if (degen.status === DegenModeStatus.ClaimedSwapped) {
+            const tokenMint = degen.tokenMint.equals(PublicKey.default)
+              ? null
+              : degen.tokenMint.toBase58();
+            const tokenSymbol = tokenMint
+              ? (await fetchDegenTokenMeta(tokenMint)).symbol
+              : null;
+            await pollRound();
+            await pollBalance();
+            return {
+              claimSig: requestSig,
+              tokenMint,
+              tokenIndex: Number.isFinite(degen.tokenIndex) ? degen.tokenIndex : null,
+              tokenSymbol,
+              fallback: false,
+            };
+          }
+          // VrfRequested, VrfReady, Executing — keep polling
         }
 
+        // Timeout — return pending state, executor will finish eventually
         await pollRound();
         await pollBalance();
-
-        if (degen.status === DegenModeStatus.ClaimedFallback) {
-          return {
-            claimSig: requestSig,
-            tokenMint: null,
-            tokenIndex: null,
-            tokenSymbol: null,
-            fallback: true,
-          };
-        }
-
-        if (degen.status === DegenModeStatus.ClaimedSwapped) {
-          const tokenMint = degen.tokenMint.equals(PublicKey.default)
-            ? null
-            : degen.tokenMint.toBase58();
-          const tokenSymbol = tokenMint
-            ? (await fetchDegenTokenMeta(tokenMint)).symbol
-            : null;
-          return {
-            claimSig: requestSig,
-            tokenMint,
-            tokenIndex: Number.isFinite(degen.tokenIndex) ? degen.tokenIndex : null,
-            tokenSymbol,
-            fallback: false,
-          };
-        }
-
-        if (
-          degen.status === DegenModeStatus.VrfRequested ||
-          degen.status === DegenModeStatus.VrfReady ||
-          degen.status === DegenModeStatus.Executing
-        ) {
-          return {
-            claimSig: requestSig,
-            tokenMint: null,
-            tokenIndex: null,
-            tokenSymbol: null,
-            fallback: false,
-          };
-        }
-
-        throw new Error("Unexpected degen claim state");
+        return {
+          claimSig: requestSig,
+          tokenMint: null,
+          tokenIndex: null,
+          tokenSymbol: null,
+          fallback: false,
+        };
       } catch (e: any) {
         setError(e.message);
         throw e;

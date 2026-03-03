@@ -31,6 +31,7 @@ import { toHistoryRoundWithDeposits } from '../hooks/useRoundHistory';
 import { clearUnclaimedPrize } from '../hooks/useJackpot';
 import type { HistoryRound } from '../hooks/useRoundHistory';
 import { fetchDegenTokenMeta } from '../lib/degenClaim';
+import { fetchTokenLogoViaJupiter } from '../lib/tokenMetadata';
 import { PARTICIPANT_COLORS } from '../mocks';
 import { formatTs } from '../lib/timeUtils';
 import {
@@ -99,6 +100,13 @@ export default function RoundDetail() {
   const [claimingMode, setClaimingMode] = useState<'usdc' | 'degen' | null>(null);
   const [claimTx, setClaimTx] = useState<string | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
+  const [degenClaimResult, setDegenClaimResult] = useState<{
+    type: 'swapped' | 'fallback' | 'pending';
+    tokenSymbol?: string;
+    tokenMint?: string;
+    tokenLogoUrl?: string;
+    sig?: string;
+  } | null>(null);
 
   const program = useMemo(() => {
     const kp = Keypair.generate();
@@ -206,6 +214,47 @@ export default function RoundDetail() {
     return () => { cancelled = true; };
   }, [connection, roundDetailId, program]);
 
+  // ── Auto-detect existing degen claim for display ──
+  useEffect(() => {
+    if (!roundData || !roundDetailId) return;
+    if (roundData.status < RoundStatus.Settled) return;
+    const winnerKey = roundData.winner;
+    if (winnerKey.equals(PublicKey.default)) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const degen = await fetchDegenClaim(program, roundDetailId, winnerKey);
+        if (cancelled || !degen) return;
+
+        if (degen.status === DegenModeStatus.ClaimedSwapped) {
+          const tokenMintStr = degen.tokenMint.equals(PublicKey.default) ? null : degen.tokenMint.toBase58();
+          const tokenSymbol = tokenMintStr ? (await fetchDegenTokenMeta(tokenMintStr)).symbol : 'TOKEN';
+          let tokenLogoUrl = '';
+          try { if (tokenMintStr) tokenLogoUrl = await fetchTokenLogoViaJupiter(tokenMintStr); } catch {}
+          if (!cancelled) {
+            setDegenClaimResult({ type: 'swapped', tokenSymbol: tokenSymbol || 'TOKEN', tokenMint: tokenMintStr || undefined, tokenLogoUrl });
+            if (!claimTx) setClaimTx('degen-swapped');
+          }
+        } else if (degen.status === DegenModeStatus.ClaimedFallback) {
+          if (!cancelled) {
+            setDegenClaimResult({ type: 'fallback' });
+            if (!claimTx) setClaimTx('degen-fallback');
+          }
+        } else if (degen.status >= DegenModeStatus.VrfRequested && degen.status <= DegenModeStatus.Executing) {
+          if (!cancelled) {
+            setDegenClaimResult({ type: 'pending' });
+            if (!claimTx) setClaimTx('degen-pending');
+          }
+        }
+      } catch {
+        // No degen claim exists — normal USDC claim or not yet claimed
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [roundData, roundDetailId, program, claimTx]);
+
   // ── Claim handler ──
   const isWinner = !!(
     roundData &&
@@ -305,20 +354,22 @@ export default function RoundDetail() {
       if (!degen) throw new Error('Degen claim state is not available yet');
 
       if (degen.status === DegenModeStatus.ClaimedFallback) {
-        setClaimTx(requestSig || 'DEGEN_FALLBACK_DONE');
+        setClaimTx(requestSig || 'degen-fallback');
+        setDegenClaimResult({ type: 'fallback', sig: requestSig || undefined });
       } else if (degen.status === DegenModeStatus.ClaimedSwapped) {
-        const tokenMint = degen.tokenMint.equals(PublicKey.default) ? null : degen.tokenMint.toBase58();
-        const tokenSymbol = tokenMint ? (await fetchDegenTokenMeta(tokenMint)).symbol : 'token';
-        setClaimTx(requestSig || `DEGEN_${tokenSymbol || 'TOKEN'}`);
+        const tokenMintStr = degen.tokenMint.equals(PublicKey.default) ? null : degen.tokenMint.toBase58();
+        const tokenSymbol = tokenMintStr ? (await fetchDegenTokenMeta(tokenMintStr)).symbol : 'token';
+        let tokenLogoUrl = '';
+        try { if (tokenMintStr) tokenLogoUrl = await fetchTokenLogoViaJupiter(tokenMintStr); } catch {}
+        setClaimTx(requestSig || `degen-${tokenSymbol}`);
+        setDegenClaimResult({ type: 'swapped', tokenSymbol: tokenSymbol || 'TOKEN', tokenMint: tokenMintStr || undefined, tokenLogoUrl, sig: requestSig || undefined });
       } else if (
         degen.status === DegenModeStatus.VrfRequested ||
         degen.status === DegenModeStatus.VrfReady ||
         degen.status === DegenModeStatus.Executing
       ) {
-        const waitMsg = requestSig
-          ? `DEGEN request sent: ${requestSig}`
-          : 'DEGEN request already pending';
-        setClaimTx(waitMsg);
+        setClaimTx(requestSig || 'degen-pending');
+        setDegenClaimResult({ type: 'pending', sig: requestSig || undefined });
       } else {
         throw new Error('Unexpected degen claim state');
       }
@@ -537,20 +588,81 @@ export default function RoundDetail() {
 
                 {/* Claim success */}
                 {claimTx && (
-                  <div className="mt-4 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Check className="w-4 h-4 text-emerald-500" />
-                      <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Prize Claimed</span>
-                    </div>
-                    <p className="text-sm font-mono font-medium text-slate-600 dark:text-slate-300 break-all">{claimTx}</p>
-                    <a
-                      href={`https://solscan.io/tx/${claimTx}${SOLSCAN_CLUSTER_QUERY}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium"
-                    >
-                      View on Solscan <ExternalLink className="w-3 h-3" />
-                    </a>
+                  <div className={`mt-4 p-4 rounded-2xl border ${degenClaimResult ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800' : 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800'}`}>
+                    {degenClaimResult?.type === 'swapped' ? (
+                      <>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Check className="w-4 h-4 text-purple-500" />
+                          <span className="text-xs font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Degen Claim — Swapped</span>
+                        </div>
+                        <div className="flex items-center gap-3 py-2">
+                          {degenClaimResult.tokenLogoUrl ? (
+                            <img
+                              src={degenClaimResult.tokenLogoUrl}
+                              alt={degenClaimResult.tokenSymbol}
+                              className="w-10 h-10 rounded-full ring-2 ring-purple-400/30 shadow-lg"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white text-sm font-black shadow-lg">
+                              {(degenClaimResult.tokenSymbol || '?').slice(0, 2)}
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-lg font-black text-slate-900 dark:text-white">{degenClaimResult.tokenSymbol}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">${payout.toFixed(2)} USDC \u2192 {degenClaimResult.tokenSymbol}</p>
+                          </div>
+                        </div>
+                        {degenClaimResult.tokenMint && (
+                          <p className="text-xs font-mono text-slate-500 dark:text-slate-400 break-all mt-1">{degenClaimResult.tokenMint}</p>
+                        )}
+                      </>
+                    ) : degenClaimResult?.type === 'fallback' ? (
+                      <>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Check className="w-4 h-4 text-amber-500" />
+                          <span className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Degen Claim — USDC Fallback</span>
+                        </div>
+                        <p className="text-sm text-slate-600 dark:text-slate-300">No viable degen route found. Paid out <span className="font-bold">${payout.toFixed(2)} USDC</span>.</p>
+                      </>
+                    ) : degenClaimResult?.type === 'pending' ? (
+                      <>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Loader2 className="w-4 h-4 text-purple-500 animate-spin" />
+                          <span className="text-xs font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Degen Claim — Processing</span>
+                        </div>
+                        <p className="text-sm text-slate-600 dark:text-slate-300">VRF requested. The executor is picking a token route...</p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Check className="w-4 h-4 text-emerald-500" />
+                          <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Prize Claimed</span>
+                        </div>
+                        <p className="text-sm font-bold text-slate-900 dark:text-white mb-1">${payout.toFixed(2)} USDC</p>
+                      </>
+                    )}
+                    {/* Tx link — skip for non-signature values */}
+                    {claimTx && !claimTx.startsWith('degen-') && claimTx.length > 30 && (
+                      <a
+                        href={`https://solscan.io/tx/${claimTx}${SOLSCAN_CLUSTER_QUERY}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium"
+                      >
+                        View on Solscan <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                    {degenClaimResult?.sig && degenClaimResult.sig.length > 30 && (
+                      <a
+                        href={`https://solscan.io/tx/${degenClaimResult.sig}${SOLSCAN_CLUSTER_QUERY}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium"
+                      >
+                        View on Solscan <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
                   </div>
                 )}
               </Card>
