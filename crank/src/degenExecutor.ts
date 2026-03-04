@@ -49,10 +49,19 @@ import {
 const POLL_MS = Number(process.env.DEGEN_EXECUTOR_POLL_MS || 5000);
 
 // Prevent crash on transient WebSocket errors (e.g. RPC WS timeout during confirmTransaction)
+let _lastWsWarnTs = 0;
+let _wsWarnCount = 0;
+const WS_WARN_THROTTLE_MS = 30_000;
 process.on("unhandledRejection", (err) => {
   const msg = err instanceof Error ? err.message : String(err);
   if (msg.includes("ws error") || msg.includes("ETIMEDOUT") || msg.includes("WebSocket")) {
-    console.warn(`[degen-executor] suppressed WS error: ${msg}`);
+    _wsWarnCount++;
+    const now = Date.now();
+    if (now - _lastWsWarnTs >= WS_WARN_THROTTLE_MS) {
+      console.warn(`[degen-executor] suppressed ${_wsWarnCount} WS error(s): ${msg}`);
+      _wsWarnCount = 0;
+      _lastWsWarnTs = now;
+    }
     return;
   }
   console.error("[degen-executor] unhandledRejection:", err);
@@ -734,8 +743,12 @@ async function ensureExecutorAta(connection: Connection, executor: Keypair): Pro
 
 async function main(): Promise<void> {
   const rpcUrl = envRequired("RPC_URL");
+  const wsUrl = (process.env.RPC_WS_URL || "").trim();
   const executor = loadKeypair(envRequired("DEGEN_EXECUTOR_KEYPAIR_PATH"));
-  const connection = new Connection(rpcUrl, "confirmed");
+  const connection = new Connection(rpcUrl, {
+    commitment: "confirmed",
+    ...(wsUrl ? { wsEndpoint: wsUrl } : {}),
+  });
   const program = createProgram(connection, executor);
 
   console.log(`[degen-executor] executor=${executor.publicKey.toBase58()} poll_ms=${POLL_MS} one_shot=${ONE_SHOT}`);
