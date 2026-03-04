@@ -76,6 +76,8 @@ const JUPITER_API_KEY = (process.env.JUPITER_API_KEY || "").trim();
 const COMPUTE_BUDGET_PROGRAM = new PublicKey("ComputeBudget111111111111111111111111111111");
 const FALLBACK_CU_LIMIT = Number(process.env.CRANK_COMPUTE_UNIT_LIMIT || 600_000);
 const FALLBACK_PRIORITY_FEE = Number(process.env.CRANK_PRIORITY_FEE_MICROLAMPORTS || 20_000);
+const DEGEN_PRIORITY_FEE = Number(process.env.DEGEN_PRIORITY_FEE_MICROLAMPORTS || 50_000);
+const DEGEN_DIRECT_USDC_CU_LIMIT = 300_000;
 const DEFAULT_TIMEOUT_MS = 10_000;
 const ONE_SHOT = process.argv.includes("--once");
 const MAX_TX_RAW_BYTES = 1232;
@@ -259,7 +261,7 @@ async function buildExecutionTx(
   slippageBps?: number,
   jackpotAlt?: AddressLookupTableAccount | null,
   vrfPayer?: PublicKey | null,
-): Promise<VersionedTransaction> {
+): Promise<{ tx: VersionedTransaction; blockhash: string; lastValidBlockHeight: number }> {
   const winner = claim.account.winner;
   const selectedMint = new PublicKey(candidate.mint);
   const selectedMintOwner = await getMintOwner(connection, selectedMint);
@@ -334,10 +336,16 @@ async function buildExecutionTx(
     receiverAta,
   );
 
-  let allIxs = [...prefixIxs, beginIx];
+  let allIxs = [
+    ...prefixIxs,
+    ComputeBudgetProgram.setComputeUnitPrice({ microLamports: DEGEN_PRIORITY_FEE }),
+    beginIx,
+  ];
   let alts: AddressLookupTableAccount[] = [];
 
   if (candidate.mint === USDC_MINT.toBase58()) {
+    // For direct USDC, also set a CU limit (no Jupiter to provide one)
+    allIxs.unshift(ComputeBudgetProgram.setComputeUnitLimit({ units: DEGEN_DIRECT_USDC_CU_LIMIT }));
     const executorUsdcAta = await getAssociatedTokenAddress(USDC_MINT, executor.publicKey);
     allIxs.push(
       createTransferInstruction(
@@ -356,9 +364,15 @@ async function buildExecutionTx(
       quote,
       receiverAta.toBase58(),
     );
-    const computeBudgetIxs = swapIxs.computeBudgetInstructions
+    // Keep Jupiter's CU limit but replace priority fee with our own
+    const jupCuIxs = swapIxs.computeBudgetInstructions
       .map(deserializeInstruction)
       .filter((ix) => ix.programId.equals(COMPUTE_BUDGET_PROGRAM));
+    const cuLimitIxs = jupCuIxs.filter((ix) => ix.data[0] === 2); // SetComputeUnitLimit discriminator = 2
+    const computeBudgetIxs = [
+      ...cuLimitIxs,
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: DEGEN_PRIORITY_FEE }),
+    ];
     const bodyIxs = [
       ...swapIxs.setupInstructions.map(deserializeInstruction),
       deserializeInstruction(swapIxs.swapInstruction),
@@ -388,13 +402,13 @@ async function buildExecutionTx(
   allIxs.push(finalizeIx);
   // Merge Jackpot ALT (our stable accounts) with Jupiter ALTs
   const mergedAlts = jackpotAlt ? [jackpotAlt, ...alts] : alts;
-  const { blockhash } = await connection.getLatestBlockhash("confirmed");
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
   const msg = new TransactionMessage({
     payerKey: executor.publicKey,
     recentBlockhash: blockhash,
     instructions: allIxs,
   }).compileToV0Message(mergedAlts);
-  return new VersionedTransaction(msg);
+  return { tx: new VersionedTransaction(msg), blockhash, lastValidBlockHeight };
 }
 
 /** Error subclass to signal that the tx may have landed despite confirm timeout. */
@@ -420,6 +434,7 @@ async function simulateAndSend(
   connection: Connection,
   tx: VersionedTransaction,
   signer: Keypair,
+  blockhashCtx?: { blockhash: string; lastValidBlockHeight: number },
 ): Promise<string> {
   tx.sign([signer]);
   try {
@@ -449,7 +464,16 @@ async function simulateAndSend(
     maxRetries: 3,
   });
   try {
-    await connection.confirmTransaction(sig, "confirmed");
+    if (blockhashCtx) {
+      // Use blockhash-based confirmation (HTTP polling) — much more reliable than
+      // the deprecated signature-only form which relies on flaky WebSocket subscriptions.
+      await connection.confirmTransaction(
+        { signature: sig, blockhash: blockhashCtx.blockhash, lastValidBlockHeight: blockhashCtx.lastValidBlockHeight },
+        "confirmed",
+      );
+    } else {
+      await connection.confirmTransaction(sig, "confirmed");
+    }
   } catch (confirmErr) {
     if (isConfirmTimeoutError(confirmErr)) {
       // Poll signature status a few times before giving up — the tx may have landed
@@ -543,7 +567,7 @@ async function processReadyClaim(
 
       for (const maxAccounts of maxAccountsAttempts) {
         try {
-          const tx = await buildExecutionTx(
+          const { tx, blockhash, lastValidBlockHeight } = await buildExecutionTx(
             connection,
             program,
             executor,
@@ -556,7 +580,7 @@ async function processReadyClaim(
             jackpotAlt,
             vrfPayer,
           );
-          const sig = await simulateAndSend(connection, tx, executor);
+          const sig = await simulateAndSend(connection, tx, executor, { blockhash, lastValidBlockHeight });
           console.log(
             `[degen-executor] round #${claim.account.roundId.toString()} executed via rank=${candidate.rank} mint=${candidate.mint} sig=${sig}` +
               (maxAccounts ? ` maxAccounts=${maxAccounts}` : "") +
@@ -583,7 +607,7 @@ async function processReadyClaim(
       // Last resort: try single-hop route with aggressive maxAccounts
       if (lastSizedError && !directUsdc) {
         try {
-          const tx = await buildExecutionTx(
+          const { tx, blockhash, lastValidBlockHeight } = await buildExecutionTx(
             connection,
             program,
             executor,
@@ -596,7 +620,7 @@ async function processReadyClaim(
             jackpotAlt,
             vrfPayer,
           );
-          const sig = await simulateAndSend(connection, tx, executor);
+          const sig = await simulateAndSend(connection, tx, executor, { blockhash, lastValidBlockHeight });
           console.log(
             `[degen-executor] round #${claim.account.roundId.toString()} executed via rank=${candidate.rank} mint=${candidate.mint} sig=${sig} (directRoute)` +
               (slipBps ? ` slippage=${slipBps}bps` : "")
@@ -690,14 +714,14 @@ async function processReadyClaim(
         fallbackReason,
       );
 
-      const { blockhash } = await connection.getLatestBlockhash("confirmed");
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
       const msg = new TransactionMessage({
         payerKey: executor.publicKey,
         recentBlockhash: blockhash,
         instructions: [...prefixIxs, fallbackIx],
       }).compileToV0Message();
       const tx = new VersionedTransaction(msg);
-      const sig = await simulateAndSend(connection, tx, executor);
+      const sig = await simulateAndSend(connection, tx, executor, { blockhash, lastValidBlockHeight });
       console.log(`[degen-executor] round #${claim.account.roundId.toString()} auto_claim_degen_fallback sig=${sig}`);
       return;
     } catch (error) {

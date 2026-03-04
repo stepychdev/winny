@@ -6,7 +6,7 @@ import { Header } from '../components/Header';
 import { useRoundHistory } from '../hooks/useRoundHistory';
 import { useNavigation } from '../contexts/NavigationContext';
 import { PROGRAM_ID, RoundStatus, DegenModeStatus, SOLSCAN_CLUSTER_QUERY } from '../lib/constants';
-import { getProgram, fetchDegenClaim } from '../lib/program';
+import { getProgram, fetchDegenClaim, getDegenClaimPda } from '../lib/program';
 import { fetchDegenTokenMeta } from '../lib/degenClaim';
 import { fetchTokenLogoViaJupiter } from '../lib/tokenMetadata';
 import {
@@ -166,6 +166,7 @@ export default function History() {
     (async () => {
       const found: typeof degenTokens = {};
       const checked: number[] = [];
+      const txFound: Record<number, string> = {};
 
       for (const r of claimedRounds) {
         if (disposed) break;
@@ -187,6 +188,22 @@ export default function History() {
           } else if (degen.status === DegenModeStatus.ClaimedFallback) {
             found[r.roundId] = { symbol: 'USDC', fallback: true };
           }
+
+          // Resolve claim TX for degen claims via degenClaim PDA
+          if (
+            (degen.status === DegenModeStatus.ClaimedSwapped || degen.status === DegenModeStatus.ClaimedFallback) &&
+            !r.claimTx && !resolvedClaimTx[r.roundId]
+          ) {
+            try {
+              const degenPda = getDegenClaimPda(r.roundId, winnerKey);
+              const sigs = await connection.getSignaturesForAddress(degenPda, { limit: 10 }, 'confirmed');
+              const successSigs = sigs.filter((s) => !s.err);
+              if (successSigs.length > 0) {
+                // getSignaturesForAddress returns newest first; the most recent successful tx is the claim/finalize
+                txFound[r.roundId] = successSigs[0].signature;
+              }
+            } catch {}
+          }
         } catch {
           // No degen claim PDA — normal USDC claim
         }
@@ -195,6 +212,9 @@ export default function History() {
       if (disposed) return;
       if (Object.keys(found).length > 0) {
         setDegenTokens((prev) => ({ ...prev, ...found }));
+      }
+      if (Object.keys(txFound).length > 0) {
+        setResolvedClaimTx((prev) => ({ ...prev, ...txFound }));
       }
       if (checked.length > 0) {
         setDegenChecked((prev) => {
@@ -206,7 +226,7 @@ export default function History() {
     })();
 
     return () => { disposed = true; };
-  }, [rounds, program, degenTokens, degenChecked]);
+  }, [rounds, program, connection, degenTokens, degenChecked, resolvedClaimTx]);
 
   const filtered = rounds.filter((r) => {
     if (searchQuery) {
